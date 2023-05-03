@@ -1,11 +1,12 @@
 # flake8: noqa: E501
 
+from __future__ import annotations
+
 import click
 import pytest
 from click.testing import CliRunner, Result
 
-from hddcoin.cmds.plotnft import validate_fee
-from hddcoin.cmds.plotnft import create_cmd, show_cmd
+from hddcoin.cmds.plotnft import create_cmd, show_cmd, validate_fee
 
 pytestmark = pytest.mark.skip("TODO: Works locally but fails on CI, needs to be fixed!")
 

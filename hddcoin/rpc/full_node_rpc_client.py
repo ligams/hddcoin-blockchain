@@ -1,4 +1,6 @@
-from typing import Dict, List, Optional, Tuple, Any
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
 
 from hddcoin.consensus.block_record import BlockRecord
 from hddcoin.full_node.signage_point import SignagePoint
@@ -14,12 +16,17 @@ from hddcoin.util.byte_types import hexstr_to_bytes
 from hddcoin.util.ints import uint32, uint64
 
 
+def coin_record_dict_backwards_compat(coin_record: Dict[str, Any]):
+    del coin_record["spent"]
+    return coin_record
+
+
 class FullNodeRpcClient(RpcClient):
     """
     Client to HDDcoin RPC, connects to a local full node. Uses HTTP/JSON, and converts back from
     JSON into native python objects before returning. All api calls use POST requests.
     Note that this is not the same as the peer protocol, or wallet protocol (which run HDDcoin's
-    protocol on top of TCP), it's a separate protocol on top of HTTP thats provides easy access
+    protocol on top of TCP), it's a separate protocol on top of HTTP that provides easy access
     to the full node.
     """
 
@@ -35,6 +42,12 @@ class FullNodeRpcClient(RpcClient):
         except Exception:
             return None
         return FullBlock.from_json_dict(response["block"])
+
+    async def get_blocks(self, start: int, end: int, exclude_reorged: bool = False) -> List[FullBlock]:
+        response = await self.fetch(
+            "get_blocks", {"start": start, "end": end, "exclude_header_hash": True, "exclude_reorged": exclude_reorged}
+        )
+        return [FullBlock.from_json_dict(block) for block in response["blocks"]]
 
     async def get_block_record_by_height(self, height) -> Optional[BlockRecord]:
         try:
@@ -80,7 +93,8 @@ class FullNodeRpcClient(RpcClient):
             response = await self.fetch("get_coin_record_by_name", {"name": coin_id.hex()})
         except Exception:
             return None
-        return CoinRecord.from_json_dict(response["coin_record"])
+
+        return CoinRecord.from_json_dict(coin_record_dict_backwards_compat(response["coin_record"]))
 
     async def get_coin_records_by_names(
         self,
@@ -95,10 +109,9 @@ class FullNodeRpcClient(RpcClient):
             d["start_height"] = start_height
         if end_height is not None:
             d["end_height"] = end_height
-        return [
-            CoinRecord.from_json_dict(coin)
-            for coin in (await self.fetch("get_coin_records_by_names", d))["coin_records"]
-        ]
+
+        response = await self.fetch("get_coin_records_by_names", d)
+        return [CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin)) for coin in response["coin_records"]]
 
     async def get_coin_records_by_puzzle_hash(
         self,
@@ -112,10 +125,9 @@ class FullNodeRpcClient(RpcClient):
             d["start_height"] = start_height
         if end_height is not None:
             d["end_height"] = end_height
-        return [
-            CoinRecord.from_json_dict(coin)
-            for coin in (await self.fetch("get_coin_records_by_puzzle_hash", d))["coin_records"]
-        ]
+
+        response = await self.fetch("get_coin_records_by_puzzle_hash", d)
+        return [CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin)) for coin in response["coin_records"]]
 
     async def get_coin_records_by_puzzle_hashes(
         self,
@@ -130,10 +142,9 @@ class FullNodeRpcClient(RpcClient):
             d["start_height"] = start_height
         if end_height is not None:
             d["end_height"] = end_height
-        return [
-            CoinRecord.from_json_dict(coin)
-            for coin in (await self.fetch("get_coin_records_by_puzzle_hashes", d))["coin_records"]
-        ]
+
+        response = await self.fetch("get_coin_records_by_puzzle_hashes", d)
+        return [CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin)) for coin in response["coin_records"]]
 
     async def get_coin_records_by_parent_ids(
         self,
@@ -148,10 +159,25 @@ class FullNodeRpcClient(RpcClient):
             d["start_height"] = start_height
         if end_height is not None:
             d["end_height"] = end_height
-        return [
-            CoinRecord.from_json_dict(coin)
-            for coin in (await self.fetch("get_coin_records_by_parent_ids", d))["coin_records"]
-        ]
+
+        response = await self.fetch("get_coin_records_by_parent_ids", d)
+        return [CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin)) for coin in response["coin_records"]]
+
+    async def get_coin_records_by_hint(
+        self,
+        hint: bytes32,
+        include_spent_coins: bool = True,
+        start_height: Optional[int] = None,
+        end_height: Optional[int] = None,
+    ) -> List:
+        d = {"hint": hint.hex(), "include_spent_coins": include_spent_coins}
+        if start_height is not None:
+            d["start_height"] = start_height
+        if end_height is not None:
+            d["end_height"] = end_height
+
+        response = await self.fetch("get_coin_records_by_hint", d)
+        return [CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin)) for coin in response["coin_records"]]
 
     async def get_additions_and_removals(self, header_hash: bytes32) -> Tuple[List[CoinRecord], List[CoinRecord]]:
         try:
@@ -161,9 +187,9 @@ class FullNodeRpcClient(RpcClient):
         removals = []
         additions = []
         for coin_record in response["removals"]:
-            removals.append(CoinRecord.from_json_dict(coin_record))
+            removals.append(CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin_record)))
         for coin_record in response["additions"]:
-            additions.append(CoinRecord.from_json_dict(coin_record))
+            additions.append(CoinRecord.from_json_dict(coin_record_dict_backwards_compat(coin_record)))
         return additions, removals
 
     async def get_block_records(self, start: int, end: int) -> List:
@@ -175,6 +201,16 @@ class FullNodeRpcClient(RpcClient):
             return []
         # TODO: return block records
         return response["block_records"]
+
+    async def get_block_spends(self, header_hash: bytes32) -> Optional[List[CoinSpend]]:
+        try:
+            response = await self.fetch("get_block_spends", {"header_hash": header_hash.hex()})
+            block_spends = []
+            for block_spend in response["block_spends"]:
+                block_spends.append(CoinSpend.from_json_dict(block_spend))
+            return block_spends
+        except Exception:
+            return None
 
     async def push_tx(self, spend_bundle: SpendBundle):
         return await self.fetch("push_tx", {"spend_bundle": spend_bundle.to_json_dict()})
@@ -199,7 +235,9 @@ class FullNodeRpcClient(RpcClient):
 
     async def get_mempool_item_by_tx_id(self, tx_id: bytes32, include_pending: bool = False) -> Optional[Dict]:
         try:
-            response = await self.fetch("get_mempool_item_by_tx_id", {"tx_id": tx_id.hex(), "include_pending": include_pending})
+            response = await self.fetch(
+                "get_mempool_item_by_tx_id", {"tx_id": tx_id.hex(), "include_pending": include_pending}
+            )
             return response["mempool_item"]
         except Exception:
             return None
@@ -226,3 +264,11 @@ class FullNodeRpcClient(RpcClient):
                 }
         except Exception:
             return None
+
+    async def get_fee_estimate(
+        self,
+        target_times: Optional[List[int]],
+        cost: Optional[int],
+    ) -> Dict[str, Any]:
+        response = await self.fetch("get_fee_estimate", {"cost": cost, "target_times": target_times})
+        return response

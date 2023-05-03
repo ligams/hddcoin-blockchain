@@ -1,0 +1,124 @@
+import { WalletType } from '@hddcoin-network/api';
+import { useGetCatListQuery, useGetWalletsQuery } from '@hddcoin-network/api-react';
+import type { CATToken, Wallet } from '@hddcoin-network/core';
+import { useCurrencyCode } from '@hddcoin-network/core';
+import { useMemo, useRef, useCallback } from 'react';
+
+export type AssetIdMapEntry = {
+  walletId: number;
+  walletType: WalletType;
+  isVerified: boolean;
+  name: string;
+  symbol?: string;
+  displayName: string;
+};
+
+export default function useAssetIdName() {
+  const { data: wallets = [], isLoading } = useGetWalletsQuery();
+  const { data: catList = [], isLoading: isCatListLoading } = useGetCatListQuery();
+  const currencyCode = useCurrencyCode();
+
+  const memoized = useMemo(() => {
+    const assetIdNameMapping = new Map<string, AssetIdMapEntry>();
+    const walletIdNameMapping = new Map<number, AssetIdMapEntry>();
+
+    if (isLoading || isCatListLoading) {
+      return { assetIdNameMapping, walletIdNameMapping };
+    }
+
+    wallets.forEach((wallet: Wallet) => {
+      const walletId: number = wallet.id;
+      const walletType: WalletType = wallet.type;
+      let assetId: string | undefined;
+      let name: string | undefined;
+      let symbol: string | undefined;
+      let isVerified = false;
+
+      if (walletType === WalletType.STANDARD_WALLET) {
+        assetId = 'hdd';
+        name = 'HDDcoin';
+        symbol = currencyCode;
+        isVerified = true;
+      } else if (walletType === WalletType.CAT) {
+        const lowercaseTail = wallet.meta.assetId.toLowerCase();
+        const cat = catList.find((catItem: CATToken) => catItem.assetId.toLowerCase() === lowercaseTail);
+
+        assetId = lowercaseTail;
+        name = wallet.name;
+
+        if (cat) {
+          symbol = cat.symbol;
+          isVerified = true;
+        }
+      }
+
+      if (assetId && name) {
+        const displayName = symbol || name;
+        const entry: AssetIdMapEntry = {
+          walletId,
+          walletType,
+          name,
+          symbol,
+          displayName,
+          isVerified,
+        };
+        assetIdNameMapping.set(assetId, entry);
+        walletIdNameMapping.set(walletId, entry);
+      }
+    });
+
+    catList.forEach((cat: CATToken) => {
+      if (assetIdNameMapping.has(cat.assetId)) {
+        return;
+      }
+
+      const { assetId } = cat;
+      const { name } = cat;
+      const { symbol } = cat;
+      const displayName = symbol || name;
+      const entry: AssetIdMapEntry = {
+        walletId: 0,
+        walletType: WalletType.CAT,
+        name,
+        symbol,
+        displayName,
+        isVerified: true,
+      };
+      assetIdNameMapping.set(assetId, entry);
+    });
+
+    // If using testnet, add a THDD assetId entry
+    if (currencyCode === 'THDD') {
+      const assetId = 'thdd';
+      const name = 'HDDcoin (Testnet)';
+      const symbol = 'THDD';
+      const displayName = symbol || name;
+      const entry: AssetIdMapEntry = {
+        walletId: 1,
+        walletType: WalletType.STANDARD_WALLET,
+        name,
+        symbol,
+        displayName,
+        isVerified: true,
+      };
+      assetIdNameMapping.set(assetId, entry);
+    }
+
+    return { assetIdNameMapping, walletIdNameMapping };
+  }, [isLoading, isCatListLoading, wallets, catList, currencyCode]);
+
+  const ref = useRef(memoized);
+  ref.current = memoized;
+
+  const lookupByAssetId = useCallback(
+    (assetId: string) => ref.current.assetIdNameMapping.get(assetId.toLowerCase()),
+    [ref]
+  );
+
+  const lookupByWalletId = useCallback(
+    (walletId: number | string) => ref.current.walletIdNameMapping.get(Number(walletId)),
+    [ref]
+  );
+
+  return { lookupByAssetId, lookupByWalletId };
+}

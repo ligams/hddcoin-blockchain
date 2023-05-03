@@ -1,3 +1,12 @@
 node_modules
-src/**/*.js
-src/**/*.jsx
+dist
+examples
+daemon
+build
+*_old
+packages/*/test/data_fixtures
+packages/wallet/*
+locales
+rollup.config.js
+webpack.**
+packages/gui/tests

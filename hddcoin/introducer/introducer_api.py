@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Callable, Optional
 
 from hddcoin.introducer.introducer import Introducer
@@ -6,7 +8,7 @@ from hddcoin.protocols.protocol_message_types import ProtocolMessageTypes
 from hddcoin.server.outbound_message import Message, make_msg
 from hddcoin.server.ws_connection import WSHDDcoinConnection
 from hddcoin.types.peer_info import TimestampedPeerInfo
-from hddcoin.util.api_decorators import api_request, peer_required
+from hddcoin.util.api_decorators import api_request
 from hddcoin.util.ints import uint64
 
 
@@ -19,8 +21,7 @@ class IntroducerAPI:
     def _set_state_changed_callback(self, callback: Callable):
         pass
 
-    @peer_required
-    @api_request
+    @api_request(peer_required=True)
     async def request_peers_introducer(
         self,
         request: RequestPeersIntroducer,

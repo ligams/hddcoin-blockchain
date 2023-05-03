@@ -6,7 +6,8 @@ from __future__ import annotations
 import pathlib
 
 import hddcoin.util.default_root
-from hddcoin.types.blockchain_format.sized_bytes import make_sized_bytes
+#from hddcoin.types.blockchain_format.sized_bytes import make_sized_bytes
+from hddcoin.types.blockchain_format.sized_bytes import SizedBytes
 
 HODL_DIR: pathlib.Path = hddcoin.util.default_root.DEFAULT_ROOT_PATH / "hodl"
 HODL_DIR_TMP: pathlib.Path = HODL_DIR / "tmp"
@@ -19,4 +20,6 @@ BYTES_PER_HDD = int(1e12)
 HTTP_GET = "get"
 HTTP_POST = "post"
 
-bytes8 = make_sized_bytes(8)
+# bytes8 = make_sized_bytes(8)
+
+_size = 8

@@ -1,3 +1,7 @@
+[submodule "hddcoin-blockchain-gui"]
+	path = hddcoin-blockchain-gui
+	url = https://github.com/HDDcoin-Network/hddcoin-blockchain-gui.git
+	branch = main
 [submodule "mozilla-ca"]
 	path = mozilla-ca
 	url = https://github.com/HDDcoin-Network/mozilla-ca.git

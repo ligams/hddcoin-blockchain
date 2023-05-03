@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 if __name__ == "__main__":
-    from tests.block_tools import create_block_tools, test_constants
-    from tests.util.keyring import TempKeyring
+    from hddcoin.simulator.block_tools import create_block_tools, test_constants
+    from hddcoin.simulator.keyring import TempKeyring
     from hddcoin.util.default_root import DEFAULT_ROOT_PATH
 
     with TempKeyring() as keychain:

@@ -1,79 +1,48 @@
-import asyncio
+from __future__ import annotations
 
 import aiohttp
 import pytest
 
-from hddcoin.protocols.shared_protocol import protocol_version
+from hddcoin.protocols.shared_protocol import capabilities, protocol_version
 from hddcoin.server.outbound_message import NodeType
 from hddcoin.server.server import HDDcoinServer, ssl_context_for_client
+from hddcoin.server.ssl_context import hddcoin_ssl_ca_paths, private_ssl_ca_paths
 from hddcoin.server.ws_connection import WSHDDcoinConnection
 from hddcoin.ssl.create_ssl import generate_ca_signed_cert
+from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.peer_info import PeerInfo
-from tests.block_tools import test_constants
 from hddcoin.util.ints import uint16
-from tests.setup_nodes import (
-    bt,
-    self_hostname,
-    setup_farmer_harvester,
-    setup_introducer,
-    setup_simulators_and_wallets,
-    setup_timelord,
-)
 
 
-async def establish_connection(server: HDDcoinServer, dummy_port: int, ssl_context) -> bool:
+async def establish_connection(server: HDDcoinServer, self_hostname: str, ssl_context) -> None:
     timeout = aiohttp.ClientTimeout(total=10)
-    session = aiohttp.ClientSession(timeout=timeout)
-    try:
-        incoming_queue: asyncio.Queue = asyncio.Queue()
+    dummy_port = 5  # this does not matter
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         url = f"wss://{self_hostname}:{server._port}/ws"
         ws = await session.ws_connect(url, autoclose=False, autoping=True, ssl=ssl_context)
-        wsc = WSHDDcoinConnection(
+        wsc = WSHDDcoinConnection.create(
             NodeType.FULL_NODE,
             ws,
+            server.api,
             server._port,
             server.log,
             True,
-            False,
+            server.received_message_callback,
             self_hostname,
-            incoming_queue,
-            lambda x, y: x,
             None,
+            bytes32(b"\x00" * 32),
             100,
             30,
+            local_capabilities_for_handshake=capabilities,
         )
-        handshake = await wsc.perform_handshake(server._network_id, protocol_version, dummy_port, NodeType.FULL_NODE)
-        await session.close()
-        return handshake
-    except Exception:
-        await session.close()
-        return False
+        await wsc.perform_handshake(server._network_id, protocol_version, dummy_port, NodeType.FULL_NODE)
+        await wsc.close()
 
 
 class TestSSL:
-    @pytest.fixture(scope="function")
-    async def harvester_farmer(self):
-        async for _ in setup_farmer_harvester(test_constants):
-            yield _
-
-    @pytest.fixture(scope="function")
-    async def wallet_node(self):
-        async for _ in setup_simulators_and_wallets(1, 1, {}):
-            yield _
-
-    @pytest.fixture(scope="function")
-    async def introducer(self):
-        async for _ in setup_introducer(21233):
-            yield _
-
-    @pytest.fixture(scope="function")
-    async def timelord(self):
-        async for _ in setup_timelord(21236, 21237, False, test_constants, bt):
-            yield _
-
     @pytest.mark.asyncio
-    async def test_public_connections(self, wallet_node):
-        full_nodes, wallets = wallet_node
+    async def test_public_connections(self, wallet_node_sim_and_wallet, self_hostname):
+        full_nodes, wallets, _ = wallet_node_sim_and_wallet
         full_node_api = full_nodes[0]
         server_1: HDDcoinServer = full_node_api.full_node.server
         wallet_node, server_2 = wallets[0]
@@ -82,179 +51,163 @@ class TestSSL:
         assert success is True
 
     @pytest.mark.asyncio
-    async def test_farmer(self, harvester_farmer):
-        harvester_api, farmer_api = harvester_farmer
+    async def test_farmer(self, farmer_one_harvester, self_hostname):
+        _, farmer_service, bt = farmer_one_harvester
+        farmer_api = farmer_service._api
 
         farmer_server = farmer_api.farmer.server
+        ca_private_crt_path, ca_private_key_path = private_ssl_ca_paths(bt.root_path, bt.config)
+        hddcoin_ca_crt_path, hddcoin_ca_key_path = hddcoin_ssl_ca_paths(bt.root_path, bt.config)
         # Create valid cert (valid meaning signed with private CA)
-        priv_crt = farmer_server._private_key_path.parent / "valid.crt"
-        priv_key = farmer_server._private_key_path.parent / "valid.key"
+        priv_crt = farmer_server.root_path / "valid.crt"
+        priv_key = farmer_server.root_path / "valid.key"
         generate_ca_signed_cert(
-            farmer_server.ca_private_crt_path.read_bytes(),
-            farmer_server.ca_private_key_path.read_bytes(),
+            ca_private_crt_path.read_bytes(),
+            ca_private_key_path.read_bytes(),
             priv_crt,
             priv_key,
         )
-        ssl_context = ssl_context_for_client(
-            farmer_server.ca_private_crt_path, farmer_server.ca_private_key_path, priv_crt, priv_key
-        )
-        connected = await establish_connection(farmer_server, 12312, ssl_context)
-        assert connected is True
+        ssl_context = ssl_context_for_client(ca_private_crt_path, ca_private_key_path, priv_crt, priv_key)
+        await establish_connection(farmer_server, self_hostname, ssl_context)
 
         # Create not authenticated cert
-        pub_crt = farmer_server._private_key_path.parent / "non_valid.crt"
-        pub_key = farmer_server._private_key_path.parent / "non_valid.key"
-        generate_ca_signed_cert(
-            farmer_server.hddcoin_ca_crt_path.read_bytes(), farmer_server.hddcoin_ca_key_path.read_bytes(), pub_crt, pub_key
-        )
-        ssl_context = ssl_context_for_client(
-            farmer_server.hddcoin_ca_crt_path, farmer_server.hddcoin_ca_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(farmer_server, 12312, ssl_context)
-        assert connected is False
-        ssl_context = ssl_context_for_client(
-            farmer_server.ca_private_crt_path, farmer_server.ca_private_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(farmer_server, 12312, ssl_context)
-        assert connected is False
+        pub_crt = farmer_server.root_path / "non_valid.crt"
+        pub_key = farmer_server.root_path / "non_valid.key"
+        generate_ca_signed_cert(hddcoin_ca_crt_path.read_bytes(), hddcoin_ca_key_path.read_bytes(), pub_crt, pub_key)
+        ssl_context = ssl_context_for_client(hddcoin_ca_crt_path, hddcoin_ca_key_path, pub_crt, pub_key)
+        with pytest.raises(aiohttp.ClientConnectorCertificateError):
+            await establish_connection(farmer_server, self_hostname, ssl_context)
+        ssl_context = ssl_context_for_client(ca_private_crt_path, ca_private_key_path, pub_crt, pub_key)
+        with pytest.raises(aiohttp.ServerDisconnectedError):
+            await establish_connection(farmer_server, self_hostname, ssl_context)
 
     @pytest.mark.asyncio
-    async def test_full_node(self, wallet_node):
-        full_nodes, wallets = wallet_node
+    async def test_full_node(self, wallet_node_sim_and_wallet, self_hostname):
+        full_nodes, wallets, bt = wallet_node_sim_and_wallet
         full_node_api = full_nodes[0]
         full_node_server = full_node_api.full_node.server
+        hddcoin_ca_crt_path, hddcoin_ca_key_path = hddcoin_ssl_ca_paths(bt.root_path, bt.config)
 
         # Create not authenticated cert
-        pub_crt = full_node_server._private_key_path.parent / "p2p.crt"
-        pub_key = full_node_server._private_key_path.parent / "p2p.key"
+        pub_crt = full_node_server.root_path / "p2p.crt"
+        pub_key = full_node_server.root_path / "p2p.key"
         generate_ca_signed_cert(
-            full_node_server.hddcoin_ca_crt_path.read_bytes(),
-            full_node_server.hddcoin_ca_key_path.read_bytes(),
+            hddcoin_ca_crt_path.read_bytes(),
+            hddcoin_ca_key_path.read_bytes(),
             pub_crt,
             pub_key,
         )
-        ssl_context = ssl_context_for_client(
-            full_node_server.hddcoin_ca_crt_path, full_node_server.hddcoin_ca_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(full_node_server, 12312, ssl_context)
-        assert connected is True
+        ssl_context = ssl_context_for_client(hddcoin_ca_crt_path, hddcoin_ca_key_path, pub_crt, pub_key)
+        await establish_connection(full_node_server, self_hostname, ssl_context)
 
     @pytest.mark.asyncio
-    async def test_wallet(self, wallet_node):
-        full_nodes, wallets = wallet_node
+    async def test_wallet(self, wallet_node_sim_and_wallet, self_hostname):
+        full_nodes, wallets, bt = wallet_node_sim_and_wallet
         wallet_node, wallet_server = wallets[0]
+        ca_private_crt_path, ca_private_key_path = private_ssl_ca_paths(bt.root_path, bt.config)
+        hddcoin_ca_crt_path, hddcoin_ca_key_path = hddcoin_ssl_ca_paths(bt.root_path, bt.config)
 
         # Wallet should not accept incoming connections
-        pub_crt = wallet_server._private_key_path.parent / "p2p.crt"
-        pub_key = wallet_server._private_key_path.parent / "p2p.key"
-        generate_ca_signed_cert(
-            wallet_server.hddcoin_ca_crt_path.read_bytes(), wallet_server.hddcoin_ca_key_path.read_bytes(), pub_crt, pub_key
-        )
-        ssl_context = ssl_context_for_client(
-            wallet_server.hddcoin_ca_crt_path, wallet_server.hddcoin_ca_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(wallet_server, 12312, ssl_context)
-        assert connected is False
+        pub_crt = wallet_server.root_path / "p2p.crt"
+        pub_key = wallet_server.root_path / "p2p.key"
+        generate_ca_signed_cert(hddcoin_ca_crt_path.read_bytes(), hddcoin_ca_key_path.read_bytes(), pub_crt, pub_key)
+        ssl_context = ssl_context_for_client(hddcoin_ca_crt_path, hddcoin_ca_key_path, pub_crt, pub_key)
+        with pytest.raises(aiohttp.ClientConnectorError):
+            await establish_connection(wallet_server, self_hostname, ssl_context)
 
         # Not even signed by private cert
-        priv_crt = wallet_server._private_key_path.parent / "valid.crt"
-        priv_key = wallet_server._private_key_path.parent / "valid.key"
+        priv_crt = wallet_server.root_path / "valid.crt"
+        priv_key = wallet_server.root_path / "valid.key"
         generate_ca_signed_cert(
-            wallet_server.ca_private_crt_path.read_bytes(),
-            wallet_server.ca_private_key_path.read_bytes(),
+            ca_private_crt_path.read_bytes(),
+            ca_private_key_path.read_bytes(),
             priv_crt,
             priv_key,
         )
-        ssl_context = ssl_context_for_client(
-            wallet_server.ca_private_crt_path, wallet_server.ca_private_key_path, priv_crt, priv_key
-        )
-        connected = await establish_connection(wallet_server, 12312, ssl_context)
-        assert connected is False
+        ssl_context = ssl_context_for_client(ca_private_crt_path, ca_private_key_path, priv_crt, priv_key)
+        with pytest.raises(aiohttp.ClientConnectorError):
+            await establish_connection(wallet_server, self_hostname, ssl_context)
 
     @pytest.mark.asyncio
-    async def test_harvester(self, harvester_farmer):
-        harvester, farmer_api = harvester_farmer
-        harvester_server = harvester.server
+    async def test_harvester(self, farmer_one_harvester, self_hostname):
+        harvesters, _, bt = farmer_one_harvester
+        harvester_server = harvesters[0]._server
+        ca_private_crt_path, ca_private_key_path = private_ssl_ca_paths(bt.root_path, bt.config)
+        hddcoin_ca_crt_path, hddcoin_ca_key_path = hddcoin_ssl_ca_paths(bt.root_path, bt.config)
 
         # harvester should not accept incoming connections
-        pub_crt = harvester_server._private_key_path.parent / "p2p.crt"
-        pub_key = harvester_server._private_key_path.parent / "p2p.key"
+        pub_crt = harvester_server.root_path / "p2p.crt"
+        pub_key = harvester_server.root_path / "p2p.key"
         generate_ca_signed_cert(
-            harvester_server.hddcoin_ca_crt_path.read_bytes(),
-            harvester_server.hddcoin_ca_key_path.read_bytes(),
+            hddcoin_ca_crt_path.read_bytes(),
+            hddcoin_ca_key_path.read_bytes(),
             pub_crt,
             pub_key,
         )
-        ssl_context = ssl_context_for_client(
-            harvester_server.hddcoin_ca_crt_path, harvester_server.hddcoin_ca_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(harvester_server, 12312, ssl_context)
-        assert connected is False
+        ssl_context = ssl_context_for_client(hddcoin_ca_crt_path, hddcoin_ca_key_path, pub_crt, pub_key)
+        with pytest.raises(aiohttp.ClientConnectorError):
+            await establish_connection(harvester_server, self_hostname, ssl_context)
 
         # Not even signed by private cert
-        priv_crt = harvester_server._private_key_path.parent / "valid.crt"
-        priv_key = harvester_server._private_key_path.parent / "valid.key"
+        priv_crt = harvester_server.root_path / "valid.crt"
+        priv_key = harvester_server.root_path / "valid.key"
         generate_ca_signed_cert(
-            harvester_server.ca_private_crt_path.read_bytes(),
-            harvester_server.ca_private_key_path.read_bytes(),
+            ca_private_crt_path.read_bytes(),
+            ca_private_key_path.read_bytes(),
             priv_crt,
             priv_key,
         )
-        ssl_context = ssl_context_for_client(
-            harvester_server.ca_private_crt_path, harvester_server.ca_private_key_path, priv_crt, priv_key
-        )
-        connected = await establish_connection(harvester_server, 12312, ssl_context)
-        assert connected is False
+        ssl_context = ssl_context_for_client(ca_private_crt_path, ca_private_key_path, priv_crt, priv_key)
+        with pytest.raises(aiohttp.ClientConnectorError):
+            await establish_connection(harvester_server, self_hostname, ssl_context)
 
     @pytest.mark.asyncio
-    async def test_introducer(self, introducer):
-        introducer_api, introducer_server = introducer
+    async def test_introducer(self, introducer_service, self_hostname):
+        introducer_server = introducer_service._node.server
+        hddcoin_ca_crt_path, hddcoin_ca_key_path = hddcoin_ssl_ca_paths(introducer_service.root_path, introducer_service.config)
 
         # Create not authenticated cert
-        pub_crt = introducer_server.hddcoin_ca_key_path.parent / "p2p.crt"
-        pub_key = introducer_server.hddcoin_ca_key_path.parent / "p2p.key"
+        pub_crt = introducer_server.root_path / "p2p.crt"
+        pub_key = introducer_server.root_path / "p2p.key"
         generate_ca_signed_cert(
-            introducer_server.hddcoin_ca_crt_path.read_bytes(),
-            introducer_server.hddcoin_ca_key_path.read_bytes(),
+            hddcoin_ca_crt_path.read_bytes(),
+            hddcoin_ca_key_path.read_bytes(),
             pub_crt,
             pub_key,
         )
-        ssl_context = ssl_context_for_client(
-            introducer_server.hddcoin_ca_crt_path, introducer_server.hddcoin_ca_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(introducer_server, 12312, ssl_context)
-        assert connected is True
+        ssl_context = ssl_context_for_client(hddcoin_ca_crt_path, hddcoin_ca_key_path, pub_crt, pub_key)
+        await establish_connection(introducer_server, self_hostname, ssl_context)
 
     @pytest.mark.asyncio
-    async def test_timelord(self, timelord):
-        timelord_api, timelord_server = timelord
+    async def test_timelord(self, timelord_service, self_hostname):
+        timelord_server = timelord_service._node.server
+        ca_private_crt_path, ca_private_key_path = private_ssl_ca_paths(
+            timelord_service.root_path, timelord_service.config
+        )
+        hddcoin_ca_crt_path, hddcoin_ca_key_path = hddcoin_ssl_ca_paths(timelord_service.root_path, timelord_service.config)
 
         # timelord should not accept incoming connections
-        pub_crt = timelord_server._private_key_path.parent / "p2p.crt"
-        pub_key = timelord_server._private_key_path.parent / "p2p.key"
+        pub_crt = timelord_server.root_path / "p2p.crt"
+        pub_key = timelord_server.root_path / "p2p.key"
         generate_ca_signed_cert(
-            timelord_server.hddcoin_ca_crt_path.read_bytes(),
-            timelord_server.hddcoin_ca_key_path.read_bytes(),
+            hddcoin_ca_crt_path.read_bytes(),
+            hddcoin_ca_key_path.read_bytes(),
             pub_crt,
             pub_key,
         )
-        ssl_context = ssl_context_for_client(
-            timelord_server.hddcoin_ca_crt_path, timelord_server.hddcoin_ca_key_path, pub_crt, pub_key
-        )
-        connected = await establish_connection(timelord_server, 12312, ssl_context)
-        assert connected is False
+        ssl_context = ssl_context_for_client(hddcoin_ca_crt_path, hddcoin_ca_key_path, pub_crt, pub_key)
+        with pytest.raises(aiohttp.ClientConnectorError):
+            await establish_connection(timelord_server, self_hostname, ssl_context)
 
         # Not even signed by private cert
-        priv_crt = timelord_server._private_key_path.parent / "valid.crt"
-        priv_key = timelord_server._private_key_path.parent / "valid.key"
+        priv_crt = timelord_server.root_path / "valid.crt"
+        priv_key = timelord_server.root_path / "valid.key"
         generate_ca_signed_cert(
-            timelord_server.ca_private_crt_path.read_bytes(),
-            timelord_server.ca_private_key_path.read_bytes(),
+            ca_private_crt_path.read_bytes(),
+            ca_private_key_path.read_bytes(),
             priv_crt,
             priv_key,
         )
-        ssl_context = ssl_context_for_client(
-            timelord_server.ca_private_crt_path, timelord_server.ca_private_key_path, priv_crt, priv_key
-        )
-        connected = await establish_connection(timelord_server, 12312, ssl_context)
-        assert connected is False
+        ssl_context = ssl_context_for_client(ca_private_crt_path, ca_private_key_path, priv_crt, priv_key)
+        with pytest.raises(aiohttp.ClientConnectorError):
+            await establish_connection(timelord_server, self_hostname, ssl_context)

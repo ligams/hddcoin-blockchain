@@ -1,29 +1,29 @@
+from __future__ import annotations
+
 import logging
-from typing import Tuple, List, Optional
+from typing import List, Optional, Tuple
+
 from blspy import G1Element
 from clvm.casts import int_from_bytes, int_to_bytes
 
 from hddcoin.clvm.singleton import SINGLETON_LAUNCHER
 from hddcoin.consensus.block_rewards import calculate_pool_reward
 from hddcoin.consensus.coinbase import pool_parent_id
-from hddcoin.pools.pool_wallet_info import PoolState, LEAVING_POOL, SELF_POOLING
-
+from hddcoin.pools.pool_wallet_info import LEAVING_POOL, SELF_POOLING, PoolState
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import Program, SerializedProgram
-
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.coin_spend import CoinSpend
-from hddcoin.wallet.puzzles.load_clvm import load_clvm
-from hddcoin.wallet.puzzles.singleton_top_layer import puzzle_for_singleton
-
 from hddcoin.util.ints import uint32, uint64
+from hddcoin.wallet.puzzles.load_clvm import load_clvm_maybe_recompile
+from hddcoin.wallet.puzzles.singleton_top_layer import puzzle_for_singleton
 
 log = logging.getLogger(__name__)
 # "Full" is the outer singleton, with the inner puzzle filled in
-SINGLETON_MOD = load_clvm("singleton_top_layer.clvm")
-POOL_WAITING_ROOM_MOD = load_clvm("pool_waitingroom_innerpuz.clvm")
-POOL_MEMBER_MOD = load_clvm("pool_member_innerpuz.clvm")
-P2_SINGLETON_MOD = load_clvm("p2_singleton_or_delayed_puzhash.clvm")
+SINGLETON_MOD = load_clvm_maybe_recompile("singleton_top_layer.clvm")
+POOL_WAITING_ROOM_MOD = load_clvm_maybe_recompile("pool_waitingroom_innerpuz.clvm")
+POOL_MEMBER_MOD = load_clvm_maybe_recompile("pool_member_innerpuz.clvm")
+P2_SINGLETON_MOD = load_clvm_maybe_recompile("p2_singleton_or_delayed_puzhash.clvm")
 POOL_OUTER_MOD = SINGLETON_MOD
 
 POOL_MEMBER_HASH = POOL_MEMBER_MOD.get_tree_hash()
@@ -169,7 +169,7 @@ def create_travel_spend(
     if is_pool_member_inner_puzzle(inner_puzzle):
         # inner sol is key_value_list ()
         # key_value_list is:
-        # "ps" -> poolstate as bytes
+        # "p" -> poolstate as bytes
         inner_sol: Program = Program.to([[("p", bytes(target))], 0])
     elif is_pool_waitingroom_inner_puzzle(inner_puzzle):
         # inner sol is (spend_type, key_value_list, pool_reward_height)
@@ -182,7 +182,7 @@ def create_travel_spend(
             f"hash:{Program.to(bytes(target)).get_tree_hash()}"
         )
         # key_value_list is:
-        # "ps" -> poolstate as bytes
+        # "p" -> poolstate as bytes
         inner_sol = Program.to([1, [("p", bytes(target))], destination_inner.get_tree_hash()])  # current or target
     else:
         raise ValueError

@@ -1,7 +1,14 @@
 # hddcoin-blockchain 
 
-![Alt text](https://hddcoin.org/images/hddcoin_100.png)
+[![HDDcoin Network logo](https://hddcoin.org/images/hddcoin_100.png "HDDcoin logo")](https://www.hddcoin.org/)
 
+| Current Release / main | Pre Release / beta |
+|         :---:          |          :---:         |
+| [![Ubuntu Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml/badge.svg)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml) [![MacOS Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml/badge.svg)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml) [![Windows Installer on Windows 10](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml/badge.svg)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml)  |  [![Ubuntu Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml/badge.svg?branch=beta)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml) [![MacOS Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml/badge.svg?branch=beta)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml) [![Windows Installer on Windows 10](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml/badge.svg?branch=beta)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml) |
+
+
+***********************************************
+# PROJECT DESCRIPTION
 HDDcoin is an eco-friendly decentralization blockchain based on the Proof of Space and Time (PoST) consensus pioneered by Chia™. It maintains network robustness, in line with Satoshi Nakamoto's principles.
 
 HDDcoin uses the powerful and secure Chialisp language for Smart Contracts, and supports digital money, global payments and applications. HDDcoin is not affiliated with Chia Network, Inc., but uses their open-sourced software as its foundation.
@@ -49,43 +56,34 @@ Please note that if you wish to co-farm with compatible plots made using the Cli
 
 You can install HDDcoin by building from source, or by using the latest binaries for your operating system.
 
-(A.) To **install from available binaries**, download executables from the correct **Releases page**:
-
-   - for solo farming, get them here ->
-   https://github.com/HDDcoin-Network/hddcoin-blockchain/releases
-   - for pool farming with FoxyPool (OG), get them here ->
-   https://github.com/felixbrucker/hddcoin-blockchain/releases
+(A.) To **install from available binaries**, download executables from:  https://github.com/HDDcoin-Network/hddcoin-blockchain/releases
 
 
 (B.) To **build from source**, do the following:
 
 ```
-# Update / Upgrade OS
+# Update / Upgrade OS:
 
    sudo apt-get update
    sudo apt-get upgrade -y
 
-# Install Git
+# Install Git:
 
    sudo apt install git -y
 
-# Checkout the correct source (either for solo or pool farming)
+# Checkout the correct source:
 
-   ## for solo farming, use this source ## ->
    git clone https://github.com/HDDcoin-Network/hddcoin-blockchain.git
 
-   ## for pool farming with FoxyPool (OG), use this source ## ->
-   git clone https://github.com/felixbrucker/hddcoin-blockchain.git
-
   
-# Install the Blockchain
+# Install the Blockchain:
 
    cd hddcoin-blockchain
    sh install.sh
    . ./activate
    hddcoin init
 
-# Install and run the GUI
+# Install and run the GUI:
 
    sh install-gui.sh
    cd hddcoin-blockchain-gui
@@ -100,7 +98,7 @@ If the client does not find any connections automatically, you can add any of th
 ***********************************************
 # UPDATE/UPGRADE INSTRUCTIONS:
 
-You can update HDDcoin from a previous version by downloading and installing the latest executable for your operating system, available from the correct **Releases page**, as described above, or by building from source:
+You can update HDDcoin from a previous version by downloading and installing the latest executable for your operating system, available from the **Releases page**, or by building from source:
 
 ```
 # Checkout the source and update
@@ -118,9 +116,6 @@ You can update HDDcoin from a previous version by downloading and installing the
 
 # Update the GUI
 
-  cd hddcoin-blockchain-gui
-  git fetch
-  cd ..
   chmod +x ./install-gui.sh
   ./install-gui.sh
 ```

@@ -17,7 +17,7 @@ from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.hodl.ContractDetails import ContractDetails
 from hddcoin.rpc.full_node_rpc_client import FullNodeRpcClient
 from hddcoin.rpc.wallet_rpc_client import WalletRpcClient
-from hddcoin.types.blockchain_format.sized_bytes import bytes32
+from hddcoin.types.blockchain_format.sized_bytes import bytes32, bytes8
 from hddcoin.types.blockchain_format.program import Program, SerializedProgram
 from hddcoin.types.coin_spend import CoinSpend
 from hddcoin.types.spend_bundle import SpendBundle
@@ -227,7 +227,12 @@ def queryBlockchainDB(sql: str,
     vlog(2, f"Querying DB at {dbPath}")
     return _querySqliteDB(dbPath, sql, params)
 
+def isVersion2DB(config: th.Optional[th.Dict] = None
+                      ) -> bool:
+    dbPath = getBlockchainDbPath(config)
 
+    return "_v2_" in str(dbPath)
+	
 sql_hodlContractSpendInfo = """\
 WITH initial AS (
     SELECT coin_name, spent FROM coin_record WHERE puzzle_hash = ?
@@ -239,11 +244,27 @@ SELECT cr.coin_name, cr.spent
 FROM coin_record cr INNER JOIN initial i ON i.coin_name = cr.coin_parent
 WHERE puzzle_hash = ?
 """
+
+sql_hodlContractSpendInfo_V2 = """\
+WITH initial AS (
+    SELECT coin_name, spent_index FROM coin_record WHERE lower(hex(puzzle_hash)) = ?
+    ORDER BY confirmed_index LIMIT 1
+)
+SELECT * FROM initial
+UNION ALL
+SELECT cr.coin_name, cr.spent_index
+FROM coin_record cr INNER JOIN initial i ON i.coin_name = cr.coin_parent
+WHERE lower(hex(puzzle_hash)) = ?
+"""
+
 def getContractSpendInfo(contractAddress: str,
                          config: th.Optional[th.Dict] = None,
                          ) -> th.List[th.Tuple[str, bool]]:
     ph = addr2puzhash(contractAddress, True)
-    rows = queryBlockchainDB(sql_hodlContractSpendInfo, (ph, ph), config = config)
+    if (isVersion2DB(config)):
+        rows = queryBlockchainDB(sql_hodlContractSpendInfo_V2, (ph, ph), config = config)
+    else:
+        rows = queryBlockchainDB(sql_hodlContractSpendInfo, (ph, ph), config = config)
     ret = [(row[0], bool(row[1])) for row in rows]
     return ret
 
@@ -287,7 +308,11 @@ async def cancelContract(hodlRpcClient: HodlRpcClient,
             raise exc.HodlError(f"Impossible cancel condition encountered with contract "
                                 f"{contract_id}. PLEASE NOTIFY THE HDDCOIN TEAM!")
 
-    cr = await fullNodeRpcClient.get_coin_record_by_name(bytes32.fromhex(recentCoinName))
+    if (isVersion2DB(config)):
+        cr = await fullNodeRpcClient.get_coin_record_by_name(recentCoinName)
+    else:
+        cr = await fullNodeRpcClient.get_coin_record_by_name(bytes32.fromhex(recentCoinName))
+		
     if cr is None:
         raise exc.HodlError(f"Unable to get info on coin {recentCoinName}. "
                             f"Is full node running?")
@@ -295,7 +320,7 @@ async def cancelContract(hodlRpcClient: HodlRpcClient,
     reveal = SerializedProgram.fromhex(vcd.puzzle_reveal)
     solution = SerializedProgram.fromhex(str(Program.to([1, cr.coin.amount, ph_b32])))
     msg = (
-        hddcoin.hodl.bytes8.fromhex(contract_id)
+        bytes8.fromhex(contract_id)
         + cr.coin.name()
         + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA
     )

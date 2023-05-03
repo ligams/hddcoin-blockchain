@@ -1,17 +1,18 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from hddcoin.consensus.cost_calculator import NPCResult
 from hddcoin.types.blockchain_format.coin import Coin
-from hddcoin.types.blockchain_format.program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.spend_bundle import SpendBundle
-from hddcoin.util.ints import uint64
+from hddcoin.util.ints import uint32, uint64
 from hddcoin.util.streamable import Streamable, streamable
 
 
-@dataclass(frozen=True)
 @streamable
+@dataclass(frozen=True)
 class MempoolItem(Streamable):
     spend_bundle: SpendBundle
     fee: uint64
@@ -19,10 +20,12 @@ class MempoolItem(Streamable):
     cost: uint64
     spend_bundle_name: bytes32
     additions: List[Coin]
-    removals: List[Coin]
-    program: SerializedProgram
+    height_added_to_mempool: uint32
 
-    def __lt__(self, other):
+    # If present, this SpendBundle is not valid at or before this height
+    assert_height: Optional[uint32] = None
+
+    def __lt__(self, other: MempoolItem) -> bool:
         return self.fee_per_cost < other.fee_per_cost
 
     @property
@@ -32,3 +35,7 @@ class MempoolItem(Streamable):
     @property
     def name(self) -> bytes32:
         return self.spend_bundle_name
+
+    @property
+    def removals(self) -> List[Coin]:
+        return self.spend_bundle.removals()

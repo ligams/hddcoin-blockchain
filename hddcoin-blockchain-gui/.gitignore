@@ -61,10 +61,6 @@ activate
 # mypy
 .mypy_cache/
 
-# Editors
-.vscode
-.idea
-
 # Packaging
 hddcoin-blockchain.tar.gz
 
@@ -90,7 +86,17 @@ main.sym
 build
 build_scripts/dist
 build_scripts/*.Dmg
-src/locales/_build
-src/locales/**/*.js
+packages/**/src/locales/_build
+packages/**/src/locales/**/*.js
 daemon/
 win_code_sign_cert.p12
+
+# testing
+packages/**/playwright-report/index.html
+
+.env
+dist
+**/coverage
+
+# JetBrains
+.idea/

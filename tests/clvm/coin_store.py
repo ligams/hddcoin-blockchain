@@ -1,18 +1,18 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from typing import Dict, Iterator, Optional
 
-from hddcoin.util.condition_tools import created_outputs_for_conditions_dict
-from hddcoin.full_node.mempool_check_conditions import mempool_check_conditions_dict, get_name_puzzle_conditions
+from hddcoin.consensus.cost_calculator import NPCResult
+from hddcoin.full_node.bundle_tools import simple_solution_generator
+from hddcoin.full_node.mempool_check_conditions import get_name_puzzle_conditions, mempool_check_time_locks
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.coin_record import CoinRecord
 from hddcoin.types.spend_bundle import SpendBundle
-from hddcoin.util.ints import uint32, uint64
-from hddcoin.full_node.bundle_tools import simple_solution_generator
 from hddcoin.util.errors import Err
-from hddcoin.consensus.cost_calculator import NPCResult
-
+from hddcoin.util.ints import uint32, uint64
 
 MAX_COST = 11000000000
 
@@ -64,37 +64,35 @@ class CoinStore:
         # this should use blockchain consensus code
 
         program = simple_solution_generator(spend_bundle)
-        result: NPCResult = get_name_puzzle_conditions(program, max_cost, cost_per_byte=cost_per_byte, safe_mode=True)
+        result: NPCResult = get_name_puzzle_conditions(
+            program, max_cost, cost_per_byte=cost_per_byte, mempool_mode=True
+        )
         if result.error is not None:
             raise BadSpendBundleError(f"condition validation failure {Err(result.error)}")
 
         ephemeral_db = dict(self._db)
-        for npc in result.npc_list:
-            for coin in created_outputs_for_conditions_dict(npc.condition_dict, npc.coin_name):
+        assert result.conds is not None
+        for spend in result.conds.spends:
+            for puzzle_hash, amount, hint in spend.create_coin:
+                coin = Coin(bytes32(spend.coin_id), bytes32(puzzle_hash), uint64(amount))
                 name = coin.name()
                 ephemeral_db[name] = CoinRecord(
                     coin,
                     uint32(now.height),
                     uint32(0),
                     False,
-                    False,
                     uint64(now.seconds),
                 )
 
-        for npc in result.npc_list:
-            prev_transaction_block_height = uint32(now.height)
-            timestamp = uint64(now.seconds)
-            coin_record = ephemeral_db.get(npc.coin_name)
-            if coin_record is None:
-                raise BadSpendBundleError(f"coin not found for id 0x{npc.coin_name.hex()}")  # noqa
-            err = mempool_check_conditions_dict(
-                coin_record,
-                npc.condition_dict,
-                prev_transaction_block_height,
-                timestamp,
-            )
-            if err is not None:
-                raise BadSpendBundleError(f"condition validation failure {Err(err)}")
+        err = mempool_check_time_locks(
+            ephemeral_db,
+            result.conds,
+            uint32(now.height),
+            uint64(now.seconds),
+        )
+
+        if err is not None:
+            raise BadSpendBundleError(f"condition validation failure {Err(err)}")
 
         return 0
 
@@ -115,7 +113,7 @@ class CoinStore:
         for spent_coin in removals:
             coin_name = spent_coin.name()
             coin_record = self._db[coin_name]
-            self._db[coin_name] = replace(coin_record, spent_block_index=now.height, spent=True)
+            self._db[coin_name] = replace(coin_record, spent_block_index=now.height)
         return additions, spend_bundle.coin_spends
 
     def coins_for_puzzle_hash(self, puzzle_hash: bytes32) -> Iterator[Coin]:
@@ -140,7 +138,6 @@ class CoinStore:
             coin,
             uint32(birthday.height),
             uint32(0),
-            False,
             False,
             uint64(birthday.seconds),
         )

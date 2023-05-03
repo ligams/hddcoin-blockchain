@@ -1,0 +1,190 @@
+name: 📦🚀 Build Installers - MacOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'long_lived/**'
+      #- main
+      - 'release/**'
+  release:
+    types: [published]
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    name: MacOS ${{ matrix.os.name }} Installer
+    runs-on: ${{ matrix.os.runs-on }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        python-version: [3.9]
+        os:
+          - runs-on: macos-10.15
+            name: intel
+            file-suffix: ""
+            mac-package-name: "HDDcoin-darwin-x64"
+            glue-name: "build-macos"
+            bladebit-suffix: macos-x86-64.tar.gz
+          #- runs-on: [macOS, ARM64]
+            #name: m1
+            #file-suffix: "-arm64"
+            #mac-package-name: "HDDcoin-darwin-arm64"
+            #glue-name: "build-mac-m1"
+            #bladebit-suffix: macos-arm64.tar.gz
+
+    steps:
+      - uses: Chia-Network/actions/clean-workspace@main
+
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: Chia-Network/actions/git-ssh-to-https@main
+
+      - name: Cleanup any leftovers that exist from previous runs
+        run: bash build_scripts/clean-runner.sh || true
+
+      - name: Set Env
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          PRE_RELEASE=$(jq -r '.release.prerelease' "$GITHUB_EVENT_PATH")
+          RELEASE_TAG=$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")
+          echo "RELEASE=true" >>$GITHUB_ENV
+          echo "PRE_RELEASE=$PRE_RELEASE" >>$GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >>$GITHUB_ENV
+          if [ $PRE_RELEASE = false ]; then
+            echo "FULL_RELEASE=true" >>$GITHUB_ENV
+          else
+            echo "FULL_RELEASE=false" >>$GITHUB_ENV
+          fi
+
+      - name: Test for secrets access
+        id: check_secrets
+        shell: bash
+        run: |
+          unset HAS_APPLE_SECRET
+          unset HAS_AWS_SECRET
+          unset HAS_GLUE_SECRET
+
+          if [ -n "$APPLE_SECRET" ]; then HAS_APPLE_SECRET='true' ; fi
+          echo HAS_APPLE_SECRET=${HAS_APPLE_SECRET} >>$GITHUB_OUTPUT
+
+          if [ -n "$GLUE_ACCESS_TOKEN" ]; then HAS_GLUE_SECRET='true' ; fi
+          echo HAS_GLUE_SECRET=${HAS_GLUE_SECRET} >>$GITHUB_OUTPUT
+        env:
+          APPLE_SECRET: "${{ secrets.APPLE_DEV_ID_APP }}"
+          GLUE_ACCESS_TOKEN: "${{ secrets.GLUE_ACCESS_TOKEN }}"
+
+      - name: Create installer version number
+        id: version_number
+        run: |
+          python3 -m venv ../venv
+          . ../venv/bin/activate
+          pip install setuptools_scm
+          echo "HDDCOIN_INSTALLER_VERSION=$(python3 ./build_scripts/installer-version.py)" >> $GITHUB_OUTPUT
+          deactivate
+
+      - name: Setup Python environment
+        uses: Chia-Network/actions/setup-python@main
+        with:
+          python-version: ${{ matrix.python-version }}
+          force-pyenv: 'true'
+
+      # This will be recreated in the next step
+      # Done now and at the end of the workflow in case the last workflow fails, and this is still around
+      - name: Delete keychain if it already exists
+        run:
+          security delete-keychain signing_temp.keychain || true
+
+      - name: Import Apple app signing certificate
+        if: steps.check_secrets.outputs.HAS_APPLE_SECRET
+        uses: Apple-Actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DEV_ID_APP }}
+          p12-password: ${{ secrets.APPLE_DEV_ID_APP_PASS }}
+
+      # Get the most recent release from chia-plotter-madmax
+      - uses: actions/github-script@v6
+        id: 'latest-madmax'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const release = await github.rest.repos.getLatestRelease({
+              owner: 'Chia-Network',
+              repo: 'chia-plotter-madmax',
+            });
+            return release.data.tag_name;
+
+      - name: Get latest madmax plotter
+        run: |
+          mkdir "$GITHUB_WORKSPACE/madmax"
+          wget -O "$GITHUB_WORKSPACE/madmax/hddcoin_plot" https://github.com/Chia-Network/chia-plotter-madmax/releases/download/${{ steps.latest-madmax.outputs.result }}/chia_plot-${{ steps.latest-madmax.outputs.result }}-macos-${{ matrix.os.name }}
+          wget -O "$GITHUB_WORKSPACE/madmax/hddcoin_plot_k34" https://github.com/Chia-Network/chia-plotter-madmax/releases/download/${{ steps.latest-madmax.outputs.result }}/chia_plot_k34-${{ steps.latest-madmax.outputs.result }}-macos-${{ matrix.os.name }}
+          chmod +x "$GITHUB_WORKSPACE/madmax/hddcoin_plot"
+          chmod +x "$GITHUB_WORKSPACE/madmax/hddcoin_plot_k34"
+
+      - name: Get latest prerelease bladebit plotter
+        if: env.PRE_RELEASE == 'true'
+        run: |
+          PRERELEASE_URL=$(curl -Ls -H "Accept: application/vnd.github+json" "https://api.github.com/repos/Chia-Network/bladebit/releases" | jq -r 'map(select(.prerelease)) | first.assets[] | select(.browser_download_url | endswith("${{ matrix.os.bladebit-suffix }}")).browser_download_url')
+          mkdir "$GITHUB_WORKSPACE/bladebit"
+          wget -O /tmp/bladebit.tar.gz $PRERELEASE_URL
+          tar -xvzf /tmp/bladebit.tar.gz -C $GITHUB_WORKSPACE/bladebit
+          chmod +x "$GITHUB_WORKSPACE/bladebit/bladebit"
+
+      - name: Get latest full release bladebit plotter
+        if: '!github.event.release.prerelease'
+        run: |
+          FULLRELEASE_URL=$(curl -Ls -H "Accept: application/vnd.github+json" "https://api.github.com/repos/Chia-Network/bladebit/releases" | jq -r 'map(select(.prerelease | not)) | first.assets[] | select(.browser_download_url | endswith("${{ matrix.os.bladebit-suffix }}")).browser_download_url')
+          mkdir "$GITHUB_WORKSPACE/bladebit"
+          wget -O /tmp/bladebit.tar.gz $FULLRELEASE_URL
+          tar -xvzf /tmp/bladebit.tar.gz -C $GITHUB_WORKSPACE/bladebit
+          chmod +x "$GITHUB_WORKSPACE/bladebit/bladebit"
+
+      - uses: ./.github/actions/install
+        with:
+          python-version: ${{ matrix.python-version }}
+          development: true
+
+      - uses: chia-network/actions/activate-venv@main
+
+      - name: Setup Node 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      - name: Build GUI
+        continue-on-error: false
+        run: |
+          cd ./build_scripts
+          sh build_macos-1-gui.sh
+
+      - name: Build MacOS DMG
+        env:
+          HDDCOIN_INSTALLER_VERSION: ${{ steps.version_number.outputs.HDDCOIN_INSTALLER_VERSION }}
+          NOTARIZE: ${{ steps.check_secrets.outputs.HAS_APPLE_SECRET }}
+          APPLE_NOTARIZE_USERNAME: "${{ secrets.APPLE_NOTARIZE_USERNAME }}"
+          APPLE_NOTARIZE_PASSWORD: "${{ secrets.APPLE_NOTARIZE_PASSWORD }}"
+          APPLE_DEV_ID_APP: "${{ secrets.APPLE_DEV_ID_APP }}"
+          APPLE_DEV_ID_APP_PASS: "${{ secrets.APPLE_DEV_ID_APP_PASS }}"
+        run: |
+          cd ./build_scripts
+          sh build_macos-2-installer.sh
+
+      - name: Upload MacOS artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: hddcoin-installers-macos-dmg-${{ matrix.os.name }}
+          path: ${{ github.workspace }}/build_scripts/final_installer/ 
+
+      - name: Remove working files to exclude from cache
+        run: |
+          rm -rf ./hddcoin-blockchain-gui/packages/gui/daemon

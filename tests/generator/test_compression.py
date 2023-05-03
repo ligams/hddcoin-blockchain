@@ -1,7 +1,14 @@
 # flake8: noqa: F501
+from __future__ import annotations
+
+import io
 from dataclasses import dataclass
-from typing import List, Any
+from typing import Any, List
 from unittest import TestCase
+
+from clvm import SExp
+from clvm.serialize import sexp_from_stream
+from clvm_tools import binutils
 
 from hddcoin.full_node.bundle_tools import (
     bundle_suitable_for_compression,
@@ -11,22 +18,15 @@ from hddcoin.full_node.bundle_tools import (
     simple_solution_generator,
     spend_bundle_to_serialized_coin_spend_entry_list,
 )
-from hddcoin.full_node.generator import run_generator, create_generator_args
+from hddcoin.full_node.generator import create_generator_args, run_generator_unsafe
 from hddcoin.full_node.mempool_check_conditions import get_puzzle_and_solution_for_coin
-from hddcoin.types.blockchain_format.program import Program, SerializedProgram, INFINITE_COST
-from hddcoin.types.generator_types import BlockGenerator, CompressorArg, GeneratorArg
+from hddcoin.types.blockchain_format.program import INFINITE_COST, Program, SerializedProgram
+from hddcoin.types.generator_types import BlockGenerator, CompressorArg
 from hddcoin.types.spend_bundle import SpendBundle
 from hddcoin.util.byte_types import hexstr_to_bytes
 from hddcoin.util.ints import uint32
 from hddcoin.wallet.puzzles.load_clvm import load_clvm
-
 from tests.core.make_block_generator import make_spend_bundle
-
-from clvm import SExp
-import io
-from clvm.serialize import sexp_from_stream
-
-from clvm_tools import binutils
 
 TEST_GEN_DESERIALIZE = load_clvm("test_generator_deserialize.clvm", package_or_requirement="hddcoin.wallet.puzzles")
 DESERIALIZE_MOD = load_clvm("chialisp_deserialisation.clvm", package_or_requirement="hddcoin.wallet.puzzles")
@@ -74,11 +74,15 @@ def create_multiple_ref_generator(args: MultipleCompressorArg, spend_bundle: Spe
     )
 
     # TODO aqk: Improve ergonomics of CompressorArg -> GeneratorArg conversion
-    generator_args = [
-        GeneratorArg(FAKE_BLOCK_HEIGHT1, args.arg[0].generator),
-        GeneratorArg(FAKE_BLOCK_HEIGHT2, args.arg[1].generator),
+    generator_list = [
+        args.arg[0].generator,
+        args.arg[1].generator,
     ]
-    return BlockGenerator(program, generator_args)
+    generator_heights = [
+        FAKE_BLOCK_HEIGHT1,
+        FAKE_BLOCK_HEIGHT2,
+    ]
+    return BlockGenerator(program, generator_list, generator_heights)
 
 
 def spend_bundle_to_coin_spend_entry_list(bundle: SpendBundle) -> List[Any]:
@@ -117,7 +121,7 @@ class TestCompression(TestCase):
             gen_args = MultipleCompressorArg([ca1, ca2], split_offset)
             spend_bundle: SpendBundle = make_spend_bundle(1)
             multi_gen = create_multiple_ref_generator(gen_args, spend_bundle)
-            cost, result = run_generator(multi_gen, INFINITE_COST)
+            cost, result = run_generator_unsafe(multi_gen, INFINITE_COST)
             results.append(result)
             assert result is not None
             assert cost > 0
@@ -130,8 +134,8 @@ class TestCompression(TestCase):
         c = compressed_spend_bundle_solution(ca, sb)
         s = simple_solution_generator(sb)
         assert c != s
-        cost_c, result_c = run_generator(c, INFINITE_COST)
-        cost_s, result_s = run_generator(s, INFINITE_COST)
+        cost_c, result_c = run_generator_unsafe(c, INFINITE_COST)
+        cost_s, result_s = run_generator_unsafe(s, INFINITE_COST)
         print(result_c)
         assert result_c is not None
         assert result_s is not None
@@ -142,14 +146,14 @@ class TestCompression(TestCase):
         start, end = match_standard_transaction_at_any_index(original_generator)
         ca = CompressorArg(uint32(0), SerializedProgram.from_bytes(original_generator), start, end)
         c = compressed_spend_bundle_solution(ca, sb)
-        removal = sb.coin_spends[0].coin.name()
-        error, puzzle, solution = get_puzzle_and_solution_for_coin(c, removal, INFINITE_COST)
+        removal = sb.coin_spends[0].coin
+        error, puzzle, solution = get_puzzle_and_solution_for_coin(c, removal)
         assert error is None
         assert bytes(puzzle) == bytes(sb.coin_spends[0].puzzle_reveal)
         assert bytes(solution) == bytes(sb.coin_spends[0].solution)
         # Test non compressed generator as well
         s = simple_solution_generator(sb)
-        error, puzzle, solution = get_puzzle_and_solution_for_coin(s, removal, INFINITE_COST)
+        error, puzzle, solution = get_puzzle_and_solution_for_coin(s, removal)
         assert error is None
         assert bytes(puzzle) == bytes(sb.coin_spends[0].puzzle_reveal)
         assert bytes(solution) == bytes(sb.coin_spends[0].solution)
@@ -157,7 +161,7 @@ class TestCompression(TestCase):
     def test_spend_byndle_coin_spend(self):
         for i in range(0, 10):
             sb: SpendBundle = make_spend_bundle(i)
-            cs1 = SExp.to(spend_bundle_to_coin_spend_entry_list(sb)).as_bin()
+            cs1 = SExp.to(spend_bundle_to_coin_spend_entry_list(sb)).as_bin()  # pylint: disable=E1101
             cs2 = spend_bundle_to_serialized_coin_spend_entry_list(sb)
             assert cs1 == cs2
 

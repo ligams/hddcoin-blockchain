@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List
 
 from clvm.casts import int_from_bytes
@@ -6,10 +8,7 @@ from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.condition_opcodes import ConditionOpcode
-from hddcoin.util.condition_tools import (
-    conditions_dict_for_solution,
-    created_outputs_for_conditions_dict,
-)
+from hddcoin.util.condition_tools import conditions_dict_for_solution, created_outputs_for_conditions_dict
 
 
 def additions_for_solution(
