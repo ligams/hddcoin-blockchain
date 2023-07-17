@@ -1,4 +1,5 @@
-export { default as HDDcoin } from './HDDcoin';
+export { default as Burn } from './Burn';
+export { default as HDDcoin, HDDcoinBlack } from './HDDcoin';
 export { default as Farm } from './Farm';
 export { default as Farming } from './Farming';
 export { default as Fees } from './Fees';
@@ -31,3 +32,13 @@ export { default as Trade } from './Trade';
 export { default as Notification } from './Notification';
 export { default as Settings } from './Settings';
 export { default as WalletConnect, ConnectCheckmark, ConnectCancel, ConnectReload, Exit } from './WalletConnect';
+export { default as Search } from './Search';
+export { default as Coins } from './ZeroState';
+export {
+  default as VC,
+  VCZeroStateBackground,
+  VCZeroStateBackgroundDark,
+  VCZeroStateBadge,
+  VCZeroStateMembership,
+  VCZeroStateKYCBadge,
+} from './VC';

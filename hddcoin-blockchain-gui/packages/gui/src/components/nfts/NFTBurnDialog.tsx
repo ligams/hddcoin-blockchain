@@ -4,6 +4,7 @@ import {
   Button,
   ButtonLoading,
   EstimatedFee,
+  FeeTxType,
   Form,
   Flex,
   TextField,
@@ -99,7 +100,6 @@ export default function NFTBurnDialog(props: NFTPreviewDialogProps) {
       await transferNFT({
         walletId: nfts[0].walletId,
         nftCoinIds: nfts.map((nft: NFTInfo) => nft.nftCoinId),
-        launcherId: nfts[0].launcherId,
         targetAddress: destination,
         fee: feeInBytes,
       }).unwrap();
@@ -165,7 +165,7 @@ export default function NFTBurnDialog(props: NFTPreviewDialogProps) {
                 color="secondary"
                 label={<Trans>Fee</Trans>}
                 disabled={isSubmitting}
-                txType="burnNFT"
+                txType={FeeTxType.transferNFT}
                 fullWidth
               />
               <DialogActions>

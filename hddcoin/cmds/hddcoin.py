@@ -7,9 +7,11 @@ import click
 
 from hddcoin import __version__
 from hddcoin.cmds.beta import beta_cmd
+from hddcoin.cmds.completion import completion
 from hddcoin.cmds.configure import configure_cmd
 from hddcoin.cmds.data import data_cmd
 from hddcoin.cmds.db import db_cmd
+from hddcoin.cmds.dev import dev_cmd
 from hddcoin.cmds.farm import farm_cmd
 from hddcoin.cmds.hodl import hodl_cmd
 from hddcoin.cmds.init import init_cmd
@@ -83,12 +85,12 @@ def cli(
     check_ssl(Path(root_path))
 
 
-@cli.command("version", short_help="Show hddcoin version")
+@cli.command("version", help="Show hddcoin version")
 def version_cmd() -> None:
     print(__version__)
 
 
-@cli.command("run_daemon", short_help="Runs hddcoin daemon")
+@cli.command("run_daemon", help="Runs hddcoin daemon")
 @click.option(
     "--wait-for-unlock",
     help="If the keyring is passphrase-protected, the daemon will wait for an unlock command before accessing keys",
@@ -126,6 +128,8 @@ cli.add_command(peer_cmd)
 cli.add_command(data_cmd)
 cli.add_command(passphrase_cmd)
 cli.add_command(beta_cmd)
+cli.add_command(completion)
+cli.add_command(dev_cmd)
 cli.add_command(hodl_cmd)
 
 

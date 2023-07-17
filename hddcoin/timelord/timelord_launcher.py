@@ -13,7 +13,7 @@ import pkg_resources
 from hddcoin.util.hddcoin_logging import initialize_logging
 from hddcoin.util.config import load_config
 from hddcoin.util.default_root import DEFAULT_ROOT_PATH
-from hddcoin.util.network import get_host_addr
+from hddcoin.util.network import resolve
 from hddcoin.util.setproctitle import setproctitle
 
 active_processes: List = []
@@ -51,7 +51,7 @@ async def spawn_process(host: str, port: int, counter: int, lock: asyncio.Lock, 
         try:
             dirname = path_to_vdf_client.parent
             basename = path_to_vdf_client.name
-            resolved = get_host_addr(host, prefer_ipv6=prefer_ipv6)
+            resolved = await resolve(host, prefer_ipv6=prefer_ipv6)
             proc = await asyncio.create_subprocess_shell(
                 f"{basename} {resolved} {port} {counter}",
                 stdout=asyncio.subprocess.PIPE,

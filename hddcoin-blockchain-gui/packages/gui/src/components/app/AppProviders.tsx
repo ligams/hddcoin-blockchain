@@ -10,6 +10,7 @@ import {
   dark,
   light,
   ErrorBoundary,
+  AuthProvider,
 } from '@hddcoin-network/core';
 import { nativeTheme } from '@electron/remote';
 import { Trans } from '@lingui/macro';
@@ -21,8 +22,11 @@ import { Outlet } from 'react-router-dom';
 import WebSocket from 'ws';
 
 import { i18n, defaultLocale, locales } from '../../config/locales';
+import CacheProvider from '../cache/CacheProvider';
 import LRUsProvider from '../lrus/LRUsProvider';
+import NFTProvider from '../nfts/provider/NFTProvider';
 import NotificationsProvider from '../notification/NotificationsProvider';
+import OffersProvider from '../offers2/OffersProvider';
 import WalletConnectProvider, { WalletConnectHDDcoinProjectId } from '../walletConnect/WalletConnectProvider';
 import AppState from './AppState';
 
@@ -74,32 +78,46 @@ export default function App(props: AppProps) {
     init();
   }, []);
 
+  // we need to wait for the config to be loaded before we can render anything with api hooks
+  if (!isReady) {
+    return (
+      <LocaleProvider i18n={i18n} defaultLocale={defaultLocale} locales={locales}>
+        <ThemeProvider theme={theme} fonts global>
+          <LayoutLoading>
+            <Typography variant="body1">
+              <Trans>Loading configuration</Trans>
+            </Typography>
+          </LayoutLoading>
+        </ThemeProvider>
+      </LocaleProvider>
+    );
+  }
+
   return (
     <Provider store={store}>
       <LocaleProvider i18n={i18n} defaultLocale={defaultLocale} locales={locales}>
         <ThemeProvider theme={theme} fonts global>
           <ErrorBoundary>
-            <LRUsProvider>
-              <ModalDialogsProvider>
-                {isReady ? (
-                  <Suspense fallback={<LayoutLoading />}>
-                    <WalletConnectProvider projectId={WalletConnectHDDcoinProjectId}>
-                      <NotificationsProvider>
-                        <AppState>{outlet ? <Outlet /> : children}</AppState>
-                        <ModalDialogs />
-                      </NotificationsProvider>
-                    </WalletConnectProvider>
-                  </Suspense>
-                ) : (
-                  <LayoutLoading>
-                    <Typography variant="body1">
-                      <Trans>Loading configuration</Trans>
-                    </Typography>
-                    <ModalDialogs />
-                  </LayoutLoading>
-                )}
-              </ModalDialogsProvider>
-            </LRUsProvider>
+            <AuthProvider>
+              <CacheProvider>
+                <LRUsProvider>
+                  <NFTProvider>
+                    <ModalDialogsProvider>
+                      <Suspense fallback={<LayoutLoading />}>
+                        <OffersProvider>
+                          <NotificationsProvider>
+                            <WalletConnectProvider projectId={WalletConnectHDDcoinProjectId}>
+                              <AppState>{outlet ? <Outlet /> : children}</AppState>
+                              <ModalDialogs />
+                            </WalletConnectProvider>
+                          </NotificationsProvider>
+                        </OffersProvider>
+                      </Suspense>
+                    </ModalDialogsProvider>
+                  </NFTProvider>
+                </LRUsProvider>
+              </CacheProvider>
+            </AuthProvider>
           </ErrorBoundary>
         </ThemeProvider>
       </LocaleProvider>

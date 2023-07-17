@@ -8,13 +8,14 @@ from clvm.casts import int_from_bytes, int_to_bytes
 from hddcoin.consensus.constants import ConsensusConstants
 from hddcoin.types.announcement import Announcement
 from hddcoin.types.blockchain_format.coin import Coin
-from hddcoin.types.blockchain_format.program import Program, SerializedProgram
+from hddcoin.types.blockchain_format.program import Program
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.coin_spend import CoinSpend
 from hddcoin.types.condition_opcodes import ConditionOpcode
 from hddcoin.types.condition_with_args import ConditionWithArgs
 from hddcoin.types.spend_bundle import SpendBundle
-from hddcoin.util.condition_tools import conditions_by_opcode, conditions_for_solution
+from hddcoin.util.condition_tools import conditions_dict_for_solution
 from hddcoin.util.hash import std_hash
 from hddcoin.util.ints import uint32, uint64
 from hddcoin.wallet.derive_keys import master_sk_to_wallet_sk
@@ -179,12 +180,9 @@ class WalletTool:
         for coin_spend in coin_spends:  # noqa
             secret_key = self.get_private_key_for_puzzle_hash(coin_spend.coin.puzzle_hash)
             synthetic_secret_key = calculate_synthetic_secret_key(secret_key, DEFAULT_HIDDEN_PUZZLE_HASH)
-            err, con, cost = conditions_for_solution(
+            conditions_dict = conditions_dict_for_solution(
                 coin_spend.puzzle_reveal, coin_spend.solution, self.constants.MAX_BLOCK_COST_CLVM
             )
-            if not con:
-                raise ValueError(err)
-            conditions_dict = conditions_by_opcode(con)
 
             for cwa in conditions_dict.get(ConditionOpcode.AGG_SIG_UNSAFE, []):
                 msg = cwa.vars[1]

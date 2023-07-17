@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from hddcoin.rpc.rpc_server import default_get_connections
+from hddcoin.rpc.rpc_server import StateChangedProtocol, default_get_connections
 from hddcoin.server.introducer_peers import VettedPeer
 from hddcoin.server.outbound_message import NodeType
 from hddcoin.server.server import HDDcoinServer
@@ -44,7 +44,7 @@ class Introducer:
     async def on_connect(self, peer: WSHDDcoinConnection) -> None:
         pass
 
-    def _set_state_changed_callback(self, callback: Callable):
+    def _set_state_changed_callback(self, callback: StateChangedProtocol) -> None:
         # TODO: fill this out?
         pass
 

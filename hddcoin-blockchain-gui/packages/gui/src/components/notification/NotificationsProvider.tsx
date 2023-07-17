@@ -1,62 +1,35 @@
-import { SyncingStatus } from '@hddcoin-network/api';
 import {
-  useGetNotificationsQuery,
-  usePrefs,
-  useDeleteNotificationsMutation,
+  useGetLoggedInFingerprintQuery,
   useCurrentFingerprintSettings,
+  useLocalStorage,
 } from '@hddcoin-network/api-react';
-import { ConfirmDialog, useOpenDialog } from '@hddcoin-network/core';
-import { useWalletState } from '@hddcoin-network/wallets';
-import { Trans } from '@lingui/macro';
-import debug from 'debug';
 import { orderBy } from 'lodash';
-import React, { useMemo, useState, useEffect, useCallback, createContext, useRef, type ReactNode } from 'react';
+import React, { useMemo, useEffect, useCallback, createContext, type ReactNode } from 'react';
 
-import NotificationType from '../../constants/NotificationType';
-import useAssetIdName from '../../hooks/useAssetIdName';
+import type Notification from '../../@types/Notification';
+import useBlockchainNotifications from '../../hooks/useBlockchainNotifications';
+import useNotificationSettings from '../../hooks/useNotificationSettings';
 import useShowNotification from '../../hooks/useShowNotification';
-import fetchOffer from '../../util/fetchOffer';
-import parseNotification from '../../util/parseNotification';
-import resolveOfferInfo from '../../util/resolveOfferInfo';
+import { pushNotificationStringsForNotificationType } from './utils';
 
-const log = debug('hddcoin-gui:useNotifications');
-
-type Notification = {
-  id: string;
-  message: string;
-  height: number;
-};
-
-export type NotificationDetails = Notification & {
-  type: NotificationType;
-  metadata: {
-    type: NotificationType;
-    version: number;
-    data: Record<string, any>;
-  };
-  valid: boolean;
-  offered?: {
-    assetType: string;
-    displayName: string;
-    displayAmount: number;
-  }[];
-  requested?: {
-    assetType: string;
-    displayName: string;
-    displayAmount: number;
-  }[];
-};
+const MAX_NOTIFICATIONS = 500;
 
 export const NotificationsContext = createContext<
   | {
-      notifications: NotificationDetails[];
+      notifications: Notification[];
       isLoading: boolean;
       error?: Error;
+
       unseenCount: number;
       setAsSeen: () => void;
-      deleteNotification: (id: string) => void;
-      enabled: boolean;
-      setEnabled: (enabled: boolean) => void;
+
+      areNotificationsEnabled: boolean;
+      setNotificationsEnabled: (enabled: boolean) => void;
+      pushNotificationsEnabled: boolean;
+      setPushNotificationsEnabled: (enabled: boolean) => void;
+
+      showNotification: (notification: Notification) => void;
+      deleteNotification: (notificationId: string) => void;
     }
   | undefined
 >(undefined);
@@ -69,186 +42,184 @@ export default function NotificationsProvider(props: NotificationsProviderProps)
   const { children } = props;
 
   const {
-    data: notifications,
-    isLoading: isLoadingNotifications,
-    error: getNotificationsError,
-  } = useGetNotificationsQuery();
-  const { state, isLoading: isLoadingWalletState } = useWalletState();
-  const [enabled, setEnabled] = usePrefs<number>('notifications', true);
-  const [lastPushNotificationHeight, setLastPushNotificationHeight, { isLoading: isLoadingPushNotificationsHeight }] =
-    useCurrentFingerprintSettings<number>('lastPushNotificationHeight', 0);
-  const [seenHeight, setSeenHeight, { isLoading: isLoadingSeenHeight }] = useCurrentFingerprintSettings<number>(
-    'notificationsSeenHeight',
+    data: currentFingerprint,
+    isLoading: isLoadingLoggedInFingerprint,
+    error: errorLoggedInFingerprint,
+  } = useGetLoggedInFingerprintQuery();
+
+  const {
+    notifications: blockchainNotifications,
+    isLoading: isLoadingBlockchainNotifications,
+    error: errorBlockchainNotifications,
+    deleteNotification,
+  } = useBlockchainNotifications();
+
+  const showPushNotification = useShowNotification();
+
+  // list of all triggered notifications except backend notifications
+  const [triggeredNotifications, setTriggeredNotifications] = useLocalStorage<Notification[]>('localNotifications', []);
+
+  const {
+    globalNotifications,
+    setGlobalNotifications,
+
+    pushNotifications,
+    setPushNotifications,
+  } = useNotificationSettings();
+
+  const [, setLastPushNotificationTimestamp, { isLoading: isLoadingPushNotificationsTimestamp, fingerprint }] =
+    useCurrentFingerprintSettings<number>('lastPushNotificationTimestamp', 0);
+
+  // state for visible badge
+  const [seenAt, setSeenAt, { isLoading: isLoadingSeenHeight }] = useCurrentFingerprintSettings<number>(
+    'notificationsSeenAt',
     0
   );
-  const [isPreparingNotifications, setIsPreparingNotifications] = useState<boolean>(false);
-  const [preparingError, setPreparingError] = useState<Error | undefined>();
-  const preparedNotificationsRef = useRef<NotificationDetails[]>([]);
-  const { lookupByAssetId } = useAssetIdName();
-  const [deleteNotifications] = useDeleteNotificationsMutation();
-  const showNotification = useShowNotification();
-  const openDialog = useOpenDialog();
-  const isSynced = state === SyncingStatus.SYNCED;
 
-  const isLoading =
-    !isSynced ||
-    isLoadingNotifications ||
-    isPreparingNotifications ||
-    isLoadingWalletState ||
-    isLoadingPushNotificationsHeight ||
-    isLoadingSeenHeight;
-  const error = getNotificationsError || preparingError;
+  const isLoadingServices = isLoadingLoggedInFingerprint || isLoadingPushNotificationsTimestamp || isLoadingSeenHeight;
 
-  const prepareNotifications = useCallback(async () => {
-    if (isPreparingNotifications) {
-      return;
-    }
+  // local can work without blockchain notifications
+  const isLoading = isLoadingServices || isLoadingBlockchainNotifications;
 
-    preparedNotificationsRef.current = [];
+  const error = (errorLoggedInFingerprint as Error | undefined) || errorBlockchainNotifications;
 
-    if (!notifications || !isSynced) {
-      return;
-    }
+  // immutable
+  const showNotification = useCallback(
+    (notification: Notification) => {
+      setTriggeredNotifications((prev = []) => [...prev, notification].slice(-MAX_NOTIFICATIONS));
+    },
+    [setTriggeredNotifications /* immutable */]
+  );
 
-    try {
-      setIsPreparingNotifications(true);
+  const triggeredNotificationsByCurrentFingerprint = useMemo(() => {
+    const list: Notification[] = [];
 
-      const prepared = (
-        await Promise.all(
-          notifications.map(async (notification) => {
-            try {
-              const { message: hexMessage } = notification;
-              const message = hexMessage ? Buffer.from(hexMessage, 'hex').toString() : '';
-              if (!message) {
-                throw new Error('Notification has not message');
-              }
+    triggeredNotifications?.forEach((notification) => {
+      const { fingerprints } = notification;
+      if (fingerprints && (!currentFingerprint || !fingerprints.includes(currentFingerprint))) {
+        return;
+      }
 
-              const metadata = parseNotification(message);
-              const { type } = metadata;
+      list.push(notification);
+    });
 
-              if ([NotificationType.OFFER, NotificationType.COUNTER_OFFER].includes(type)) {
-                const {
-                  data: { url },
-                } = metadata;
-                const data = await fetchOffer(url);
-                const { valid, offerSummary } = data;
-                if (!valid) {
-                  return null;
-                }
+    return list;
+  }, [triggeredNotifications, currentFingerprint]);
 
-                const offered = resolveOfferInfo(offerSummary, 'offered', lookupByAssetId);
-                const requested = resolveOfferInfo(offerSummary, 'requested', lookupByAssetId);
+  const notifications = useMemo(() => {
+    // only show blockchain notifications when synced otherwise it will be not able to download notification state
+    const list: Notification[] = [...blockchainNotifications, ...triggeredNotificationsByCurrentFingerprint];
 
-                // todo add limit to 1 NFT per offer
-
-                return {
-                  type,
-                  metadata,
-                  offered,
-                  requested,
-                  ...data,
-                  ...notification,
-                };
-              }
-
-              throw new Error(`Unknown notification type: ${type}`);
-            } catch (e) {
-              log('Failed to prepare notification', e);
-              return null;
-            }
-          })
-        )
-      ).filter(Boolean);
-
-      const sortedNotifications = orderBy(prepared, ['height'], ['desc']);
-
-      preparedNotificationsRef.current = sortedNotifications;
-    } catch (e) {
-      setPreparingError(e as Error);
-    } finally {
-      setIsPreparingNotifications(false);
-    }
-    // TODO: fix dependency array
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- isPreparingNotifications causes this to run infinitely
-  }, [notifications, lookupByAssetId, isSynced]);
+    return orderBy(list, ['timestamp'], ['desc']);
+  }, [triggeredNotificationsByCurrentFingerprint, blockchainNotifications]);
 
   const showPushNotifications = useCallback(() => {
-    if (!enabled || isLoading) {
+    // if fingerprint is not set then we can't show push notifications (user is not logged in)
+    if (!globalNotifications || !pushNotifications || isLoadingServices || !fingerprint) {
       return;
     }
 
-    const firstUnseenNotification = preparedNotificationsRef.current.find(
-      (notification) => notification.height > lastPushNotificationHeight
-    );
+    setLastPushNotificationTimestamp((prevLastPushNotificationTimestamp = 0) => {
+      const firstUnseenNotification = notifications.find(
+        (notification) => notification.timestamp > prevLastPushNotificationTimestamp
+      );
 
-    if (!firstUnseenNotification) {
-      return;
-    }
+      if (!firstUnseenNotification) {
+        return prevLastPushNotificationTimestamp;
+      }
 
-    setLastPushNotificationHeight(firstUnseenNotification.height);
-    showNotification({
-      title: 'New Offer',
-      body: 'You have a new offer',
+      const { title, body } = pushNotificationStringsForNotificationType(firstUnseenNotification);
+
+      showPushNotification({
+        title,
+        body,
+      });
+
+      return firstUnseenNotification.timestamp;
     });
-  }, [lastPushNotificationHeight, enabled, setLastPushNotificationHeight, showNotification, isLoading]);
+  }, [
+    globalNotifications,
+    pushNotifications,
+    isLoadingServices,
+    setLastPushNotificationTimestamp,
+    notifications,
+    showPushNotification,
+    fingerprint,
+  ]);
 
-  const unseenCount = useMemo(() => {
-    if (isLoading) {
-      return 0;
+  const unseenCount = useMemo(
+    () =>
+      seenAt ? notifications.filter((notification) => notification.timestamp > seenAt).length : notifications.length,
+    [seenAt, notifications]
+  );
+
+  const setAsSeen = useCallback(() => {
+    const [firstNotification] = notifications;
+    if (firstNotification) {
+      const { timestamp } = firstNotification;
+      setSeenAt((prevSeenAt: number = 0) => Math.max(prevSeenAt, timestamp));
     }
+  }, [setSeenAt, notifications]);
 
-    return preparedNotificationsRef.current.filter((notification) => notification.height > seenHeight).length;
-  }, [seenHeight, isLoading]);
+  const handleDeleteNotification = useCallback(
+    async (notificationId: string) => {
+      let deleted = false;
 
-  useEffect(() => {
-    prepareNotifications();
-  }, [prepareNotifications]);
+      setTriggeredNotifications((prev = []) => {
+        const index = prev.findIndex((notification) => notification.id === notificationId);
+        if (index !== -1) {
+          deleted = true;
+          return [...prev.slice(0, index), ...prev.slice(index + 1)];
+        }
+
+        return prev;
+      });
+
+      if (!deleted) {
+        await deleteNotification(notificationId);
+      }
+    },
+    [setTriggeredNotifications, deleteNotification]
+  );
 
   useEffect(() => {
     showPushNotifications();
   }, [showPushNotifications]);
 
-  const setAsSeen = useCallback(() => {
-    const highestHeight = preparedNotificationsRef.current.reduce(
-      (acc, notification) => Math.max(notification.height, acc),
-      0
-    );
-
-    setSeenHeight(highestHeight);
-  }, [setSeenHeight]);
-
-  const handleDeleteNotification = useCallback(
-    async (id: string) => {
-      await openDialog(
-        <ConfirmDialog
-          title={<Trans>Please Confirm</Trans>}
-          confirmTitle={<Trans>Delete</Trans>}
-          confirmColor="danger"
-          onConfirm={() =>
-            deleteNotifications({
-              ids: [id],
-            }).unwrap()
-          }
-        >
-          <Trans>Do you want to remove this offer notification? This action cannot be undone.</Trans>
-        </ConfirmDialog>
-      );
-    },
-    [deleteNotifications, openDialog]
-  );
-
   const contextValue = useMemo(
     () => ({
-      notifications: isSynced ? preparedNotificationsRef.current : [],
+      // base state
+      notifications,
       isLoading,
       error,
+      // seen
       unseenCount,
       setAsSeen,
+      // settings
+      areNotificationsEnabled: globalNotifications,
+      setNotificationsEnabled: setGlobalNotifications,
+      pushNotificationsEnabled: pushNotifications,
+      setPushNotificationsEnabled: setPushNotifications,
+
+      showNotification,
       deleteNotification: handleDeleteNotification,
-      enabled,
-      setEnabled,
     }),
-    [isLoading, error, unseenCount, setAsSeen, handleDeleteNotification, enabled, setEnabled, isSynced]
+    [
+      notifications,
+      isLoading,
+      error,
+
+      unseenCount,
+      setAsSeen,
+
+      globalNotifications,
+      setGlobalNotifications,
+      pushNotifications,
+      setPushNotifications,
+
+      showNotification,
+      handleDeleteNotification,
+    ]
   );
 
   return <NotificationsContext.Provider value={contextValue}>{children}</NotificationsContext.Provider>;

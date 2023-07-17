@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto-browserify';
 import JSONbig from 'json-bigint';
 
 import type MessageInterface from './@types/MessageInterface';
-import ServiceName from './constants/ServiceName';
+import { type ServiceNameValue } from './constants/ServiceName';
 import toCamelCase from './utils/toCamelCase';
 import toSafeNumber from './utils/toSafeNumber';
 import toSnakeCase from './utils/toSnakeCase';
@@ -12,9 +12,9 @@ export default class Message implements MessageInterface {
 
   data: Object;
 
-  origin: ServiceName;
+  origin: ServiceNameValue;
 
-  destination: ServiceName;
+  destination: ServiceNameValue;
 
   ack: boolean;
 
@@ -54,7 +54,18 @@ export default class Message implements MessageInterface {
   }
 
   static fromJSON(json: string, useCamelCase: boolean): Message {
-    const { command, data, origin, destination, ack, request_id: requestId } = toSafeNumber(JSONbig.parse(json));
+    interface MessageSnakeCase extends Message {
+      request_id?: Message['requestId'];
+    }
+
+    const {
+      command,
+      data,
+      origin,
+      destination,
+      ack,
+      request_id: requestId,
+    }: MessageSnakeCase = toSafeNumber(JSONbig.parse(json)) as any;
 
     return new Message({
       command,

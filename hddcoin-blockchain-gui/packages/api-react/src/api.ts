@@ -1,8 +1,8 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
-import hddcoinLazyBaseQuery from './hddcoinLazyBaseQuery';
+import baseQuery from './hddcoinLazyBaseQuery';
 
-export const baseQuery = hddcoinLazyBaseQuery({});
+export { baseQuery };
 
 export default createApi({
   reducerPath: 'hddcoinApi',

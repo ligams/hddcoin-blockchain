@@ -1,6 +1,11 @@
+import { t } from '@lingui/macro';
+
+import type Notification from '../../@types/Notification';
+import NotificationType from '../../constants/NotificationType';
+
 const NOTIFICATION_MESSAGE_VERSION = 1;
 
-enum NotificationTypeId {
+export enum NotificationTypeId {
   OFFER = 1,
 }
 
@@ -56,11 +61,11 @@ export function createOfferNotificationPayload({
 
 export function parseNotificationPayload(payload: string): { type: NotificationTypeId; data: NotificationData } | null {
   try {
-    const { v, t, d } = JSON.parse(payload);
+    const { v, t: notificationType, d } = JSON.parse(payload);
     if (v !== NOTIFICATION_MESSAGE_VERSION) {
       return null;
     }
-    return { type: t, data: d };
+    return { type: notificationType, data: d };
   } catch (e) {
     return null;
   }
@@ -79,5 +84,42 @@ export function parseNotificationOfferData(payload: string): NotificationOfferDa
   return {
     u: parsed.data?.u ?? '',
     ph: parsed.data?.ph,
+  };
+}
+
+export function pushNotificationStringsForNotificationType(notification: Notification): {
+  title: string;
+  body: string;
+} {
+  let title;
+  let body;
+
+  const { type, from } = notification;
+
+  switch (type) {
+    case NotificationType.OFFER:
+      title = t`New offer`;
+      body = t`You have received a new offer`;
+      break;
+    case NotificationType.COUNTER_OFFER:
+      title = t`New counter offer`;
+      body = t`You have received a new counter offer`;
+      break;
+    case NotificationType.ANNOUNCEMENT:
+      title = from ? t`Dapp ${from} sending the message` : t`Dapp sending the message`;
+      body =
+        'message' in notification
+          ? notification.message
+          : 'url' in notification
+          ? notification.url
+          : t`Message not available`;
+      break;
+    default:
+      throw new Error(`Unknown notification type: ${type}`);
+  }
+
+  return {
+    title,
+    body,
   };
 }

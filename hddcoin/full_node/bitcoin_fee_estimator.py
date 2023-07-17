@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from hddcoin.full_node.fee_estimate_store import FeeStore
-from hddcoin.full_node.fee_estimation import EmptyFeeMempoolInfo, FeeBlockInfo, FeeMempoolInfo
+from hddcoin.full_node.fee_estimation import EmptyFeeMempoolInfo, FeeBlockInfo, FeeMempoolInfo, MempoolItemInfo
 from hddcoin.full_node.fee_estimator import SmartFeeEstimator
 from hddcoin.full_node.fee_estimator_interface import FeeEstimatorInterface
 from hddcoin.full_node.fee_tracker import FeeTracker
 from hddcoin.types.clvm_cost import CLVMCost
 from hddcoin.types.fee_rate import FeeRateV2
-from hddcoin.types.mempool_item import MempoolItem
 from hddcoin.util.ints import uint32, uint64
 
 
@@ -35,11 +34,11 @@ class BitcoinFeeEstimator(FeeEstimatorInterface):
         self.block_height = block_info.block_height
         self.tracker.process_block(block_info.block_height, block_info.included_items)
 
-    def add_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItem) -> None:
+    def add_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItemInfo) -> None:
         self.last_mempool_info = mempool_info
         self.tracker.add_tx(mempool_item)
 
-    def remove_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItem) -> None:
+    def remove_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItemInfo) -> None:
         self.last_mempool_info = mempool_info
         self.tracker.remove_tx(mempool_item)
 

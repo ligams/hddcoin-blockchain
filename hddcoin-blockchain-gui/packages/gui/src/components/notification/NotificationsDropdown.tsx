@@ -1,5 +1,6 @@
-import { DropdownBase } from '@hddcoin-network/core';
+import { DropdownBase, Tooltip } from '@hddcoin-network/core';
 import { Notification as NotificationIcon } from '@hddcoin-network/icons';
+import { Trans } from '@lingui/macro';
 import { Badge, Box, Button } from '@mui/material';
 import React from 'react';
 
@@ -14,6 +15,7 @@ const buttonStyle = (theme) => ({
   '&:hover': {
     borderColor: theme.palette.mode === 'dark' ? 'border.dark' : 'border.main',
   },
+  padding: '0 8px',
 });
 
 export default function NotificationsDropdown() {
@@ -28,17 +30,21 @@ export default function NotificationsDropdown() {
             onToggle(event);
             setAsSeen();
           }}
-          variant="outlined"
+          variant="text"
           color="secondary"
           size="small"
           sx={buttonStyle}
         >
-          <Badge color="primary" badgeContent={unseenCount} invisible={!unseenCount}>
-            <NotificationIcon color="secondary" />
-          </Badge>
+          <Tooltip title={<Trans>Activity</Trans>}>
+            <Badge color="primary" badgeContent={unseenCount} invisible={!unseenCount}>
+              <NotificationIcon color="info" />
+            </Badge>
+          </Tooltip>
         </Button>,
         <Box sx={{ minWidth: 360 }}>
-          <NotificationsMenu onClose={onClose} size={3} />
+          <Tooltip title={<Trans>Activity</Trans>}>
+            <NotificationsMenu onClose={onClose} size={5} />
+          </Tooltip>
         </Box>,
       ]}
     </DropdownBase>

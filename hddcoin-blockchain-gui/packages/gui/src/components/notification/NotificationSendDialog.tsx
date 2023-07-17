@@ -1,11 +1,12 @@
 import { toBech32m, fromBech32m } from '@hddcoin-network/api';
-import { useGetCurrentAddressQuery, useGetNFTInfoQuery, useSendNotificationsMutation } from '@hddcoin-network/api-react';
+import { useGetCurrentAddressQuery, useSendNotificationMutation } from '@hddcoin-network/api-react';
 import {
   AlertDialog,
   Amount,
   ButtonLoading,
   CopyToClipboard,
   EstimatedFee,
+  FeeTxType,
   Flex,
   Form,
   Loading,
@@ -32,6 +33,7 @@ import {
 import React, { SyntheticEvent, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
+import useNFT from '../../hooks/useNFT';
 import { launcherIdFromNFTId } from '../../util/nfts';
 import NFTPreview from '../nfts/NFTPreview';
 import { createOfferNotificationPayload } from './utils';
@@ -47,35 +49,37 @@ type NotificationSendDialogFormData = {
 
 export type NotificationSendDialogProps = {
   offerURL: string;
-  nftId: string;
+  destination: string;
+  destinationType: 'address' | 'nft';
   // recommendedAmount?: string;
   open?: boolean;
   onClose?: () => void;
-  address?: string;
 };
 
 export default function NotificationSendDialog(props: NotificationSendDialogProps) {
   const {
     offerURL,
-    nftId,
+    destination,
+    destinationType,
     // recommendedAmount = DEFAULT_MESSAGE_COST,
     onClose = () => ({}),
     open = false,
-    address: defaultAddress = '',
     ...rest
   } = props;
+  const isNFTOffer = destinationType === 'nft';
+  const defaultAddress = isNFTOffer ? '' : destination;
+  const launcherId = launcherIdFromNFTId(isNFTOffer ? destination : '');
   const methods = useForm<NotificationSendDialogFormData>({
     defaultValues: { address: defaultAddress, amount: '0.0001', allowCounterOffer: true, fee: '' },
   });
-  const launcherId = launcherIdFromNFTId(nftId ?? '');
   const currencyCode = useCurrencyCode();
   const openDialog = useOpenDialog();
-  const { data: nft } = useGetNFTInfoQuery({ coinId: launcherId ?? '' });
+  const { nft } = useNFT(launcherId);
   const { data: currentAddress = '' } = useGetCurrentAddressQuery({ walletId: 1 });
-  const [sendNotifications] = useSendNotificationsMutation();
-  const [, setMetadata] = React.useState<any>({});
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [sendNotification, { isLoading: isSendNotificationLoading }] = useSendNotificationMutation();
+
+  const [isLoading, setIsLoading] = React.useState(isNFTOffer);
+
   const address = methods.watch('address');
   const allowCounterOffer = methods.watch('allowCounterOffer');
 
@@ -120,22 +124,18 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
 
     const hexMessage = Buffer.from(payload).toString('hex');
 
-    setIsSubmitting(true);
-
     try {
-      const result = await sendNotifications({
+      await sendNotification({
         target: targetPuzzleHash,
         amount: amountBytes,
         message: hexMessage,
         fee: feeBytes,
       }).unwrap();
 
-      success = result?.success ?? false;
+      success = true;
     } catch (e: any) {
       console.error(e);
       error = e.message;
-    } finally {
-      setIsSubmitting(false);
     }
 
     const resultDialog = (
@@ -186,9 +186,11 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
                 </Flex>
               ) : (
                 <Flex flexDirection="column" alignItems="center" gap={3}>
-                  <Box sx={nftPreviewContainer}>
-                    <NFTPreview nft={nft} disableThumbnail setNFTCardMetadata={setMetadata} />
-                  </Box>
+                  {isNFTOffer && (
+                    <Box sx={nftPreviewContainer}>
+                      <NFTPreview id={launcherId} disableInteractions />
+                    </Box>
+                  )}
                   {/* <Flex flexDirection="column" alignItems="center" gap={1}>
                     <Typography variant="h6">
                       <Trans>Message the NFT Holder</Trans>
@@ -205,7 +207,11 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
                     <Grid item xs={12}>
                       <Flex flexDirection="column" gap={1}>
                         <Typography variant="caption" color="textPrimary">
-                          <Trans>NFT holder address</Trans>
+                          {isNFTOffer ? (
+                            <Trans>NFT holder address</Trans>
+                          ) : (
+                            <Trans>Notification recipient's address</Trans>
+                          )}
                         </Typography>
                         <TextField
                           variant="filled"
@@ -227,7 +233,11 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
                     <Grid item xs={12}>
                       <Flex flexDirection="column" gap={1}>
                         <Typography variant="caption" color="textPrimary">
-                          <Trans>Cost to send notification to the NFT holder</Trans>
+                          {isNFTOffer ? (
+                            <Trans>Cost to send notification to the NFT holder</Trans>
+                          ) : (
+                            <Trans>Cost to send notification</Trans>
+                          )}
                         </Typography>
                         <Amount
                           variant="filled"
@@ -248,8 +258,8 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
                       <EstimatedFee
                         name="fee"
                         label={<Trans>Transaction Fee</Trans>}
-                        txType="walletSendHDD"
-                        disabled={isSubmitting}
+                        txType={FeeTxType.walletSendHDD}
+                        disabled={isSendNotificationLoading}
                         fullWidth
                       />
                     </Grid>
@@ -269,7 +279,13 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
                               onChange={handleToggleAllowCounterOffer}
                             />
                           }
-                          label={<Trans>Allow the NFT holder to send a counter offer</Trans>}
+                          label={
+                            isNFTOffer ? (
+                              <Trans>Allow the NFT holder to send a counter offer</Trans>
+                            ) : (
+                              <Trans>Allow the recipient to send a counter offer</Trans>
+                            )
+                          }
                         />
                         <Typography
                           variant="caption"
@@ -290,7 +306,7 @@ export default function NotificationSendDialog(props: NotificationSendDialogProp
                 <Button onClick={handleClose} color="primary" variant="outlined">
                   <Trans>Close</Trans>
                 </Button>
-                <ButtonLoading type="submit" color="primary" variant="contained" loading={isSubmitting}>
+                <ButtonLoading type="submit" color="primary" variant="contained" loading={isSendNotificationLoading}>
                   <Trans>Send Message</Trans>
                 </ButtonLoading>
               </Flex>

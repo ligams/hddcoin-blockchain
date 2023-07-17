@@ -7,6 +7,8 @@ build
 packages/*/test/data_fixtures
 packages/wallet/*
 locales
+restoreMessages.js
 rollup.config.js
 webpack.**
 packages/gui/tests
+**/coverage/**

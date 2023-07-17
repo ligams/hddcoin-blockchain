@@ -6,7 +6,7 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import { Button, ListItemIcon, Typography, Divider } from '@mui/material';
-import React from 'react';
+import React, { useCallback } from 'react';
 
 import useWalletConnectContext from '../../hooks/useWalletConnectContext';
 import useWalletConnectPreferences from '../../hooks/useWalletConnectPreferences';
@@ -25,14 +25,14 @@ export default function WalletConnectConnections(props: WalletConnectConnections
   const { enabled, setEnabled } = useWalletConnectPreferences();
   const { disconnect, pairs, isLoading } = useWalletConnectContext();
 
-  async function handleAddConnection() {
+  const handleAddConnection = useCallback(async () => {
     onClose?.();
     const topic = await openDialog(<WalletConnectAddConnectionDialog />);
 
     if (topic) {
       await openDialog(<WalletConnectConnectedDialog topic={topic} />);
     }
-  }
+  }, [onClose, openDialog]);
 
   async function handleDisconnect(topic: string) {
     try {
@@ -47,10 +47,13 @@ export default function WalletConnectConnections(props: WalletConnectConnections
     setEnabled(true);
   }
 
-  function handleShowMoreInfo(topic: string) {
-    onClose?.();
-    openDialog(<WalletConnectPairInfoDialog topic={topic} />);
-  }
+  const handleShowMoreInfo = useCallback(
+    (topic: string) => {
+      onClose?.();
+      openDialog(<WalletConnectPairInfoDialog topic={topic} />);
+    },
+    [onClose, openDialog]
+  );
 
   const pairsList = pairs.get();
 

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from unittest import TestCase
 
-from hddcoin.types.blockchain_format.program import INFINITE_COST, Program, SerializedProgram
+from hddcoin.types.blockchain_format.program import INFINITE_COST, Program
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.wallet.puzzles.load_clvm import load_clvm
 
-SHA256TREE_MOD = load_clvm("sha256tree_module.clvm")
+SHA256TREE_MOD = load_clvm("sha256tree_module.clsp")
 
 
 # TODO: test multiple args

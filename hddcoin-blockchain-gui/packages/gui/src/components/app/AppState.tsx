@@ -1,6 +1,12 @@
 import { IpcRenderer } from 'electron';
 
-import { ConnectionState, ServiceHumanName, ServiceName, PassphrasePromptReason } from '@hddcoin-network/api';
+import {
+  ConnectionState,
+  ServiceHumanName,
+  ServiceName,
+  ServiceNameValue,
+  PassphrasePromptReason,
+} from '@hddcoin-network/api';
 import {
   useCloseMutation,
   useGetStateQuery,
@@ -8,7 +14,16 @@ import {
   useServices,
   useGetVersionQuery,
 } from '@hddcoin-network/api-react';
-import { Flex, LayoutHero, LayoutLoading, useMode, useIsSimulator, useAppVersion } from '@hddcoin-network/core';
+import {
+  Flex,
+  LayoutHero,
+  LayoutLoading,
+  Mode,
+  useMode,
+  useIsSimulator,
+  useAppVersion,
+  useCurrencyCode,
+} from '@hddcoin-network/core';
 import { Trans } from '@lingui/macro';
 import { Typography, Collapse } from '@mui/material';
 import isElectron from 'is-electron';
@@ -18,7 +33,6 @@ import ModeServices, { SimulatorServices } from '../../constants/ModeServices';
 import useEnableDataLayerService from '../../hooks/useEnableDataLayerService';
 import useEnableFilePropagationServer from '../../hooks/useEnableFilePropagationServer';
 import useNFTMetadataLRU from '../../hooks/useNFTMetadataLRU';
-import NFTContextualActionsEventEmitter from '../nfts/NFTContextualActionsEventEmitter';
 import AppAutoLogin from './AppAutoLogin';
 import AppKeyringMigrator from './AppKeyringMigrator';
 import AppPassPrompt from './AppPassPrompt';
@@ -53,13 +67,15 @@ export default function AppState(props: Props) {
   const [isDataLayerEnabled] = useState(enableDataLayerService);
   const [isFilePropagationServerEnabled] = useState(enableFilePropagationServer);
   const [versionDialog, setVersionDialog] = useState<boolean>(true);
+  const [updatedWindowTitle, setUpdatedWindowTitle] = useState<boolean>(false);
   const { data: backendVersion } = useGetVersionQuery();
   const { version } = useAppVersion();
   const lru = useNFTMetadataLRU();
+  const isTestnet = useCurrencyCode() === 'THDD';
 
-  const runServices = useMemo<ServiceName[] | undefined>(() => {
+  const runServices = useMemo<ServiceNameValue[] | undefined>(() => {
     if (mode) {
-      const services: ServiceName[] = isSimulator ? SimulatorServices : ModeServices[mode];
+      const services: ServiceNameValue[] = isSimulator ? SimulatorServices : ModeServices[mode];
 
       if (isDataLayerEnabled) {
         if (!services.includes(ServiceName.DATALAYER)) {
@@ -90,14 +106,25 @@ export default function AppState(props: Props) {
       return false;
     }
 
-    const specificRunningServiceStates = servicesState.running.filter((serviceState) =>
-      runServices.includes(serviceState.service)
+    const specificRunningServiceStates = servicesState.running.filter((serviceName) =>
+      runServices.includes(serviceName)
     );
 
     return specificRunningServiceStates.length === runServices.length;
   }, [servicesState, runServices]);
 
   const isConnected = !isClientStateLoading && clientState?.state === ConnectionState.CONNECTED;
+
+  useEffect(() => {
+    const allRunningServices = servicesState.running.map((serviceState) => serviceState.service);
+    const nonWalletServiceRunning = allRunningServices.some((service) => service !== ServiceName.WALLET);
+
+    if (mode === Mode.WALLET && !nonWalletServiceRunning) {
+      window.ipcRenderer.invoke('setPromptOnQuit', false);
+    } else {
+      window.ipcRenderer.invoke('setPromptOnQuit', true);
+    }
+  }, [mode, servicesState]);
 
   useEffect(() => {
     async function handleClose(event) {
@@ -114,32 +141,18 @@ export default function AppState(props: Props) {
       event.sender.send('daemon-exited');
     }
 
-    function handleRemovedCachedFile(e: any, hash: string) {
-      Object.keys({ ...localStorage }).forEach((key: string) => {
-        try {
-          const json = JSON.parse(localStorage.getItem(key)!);
-          if (json.binary === hash || json.video === hash || json.image === hash) {
-            localStorage.removeItem(key);
-            const nftId = key.replace('thumb-cache-', '').replace('metadata-cache-', '').replace('content-cache-', '');
-            NFTContextualActionsEventEmitter.emit(`force-reload-metadata-${nftId}`);
-            if (lru.get(nftId)) {
-              lru.delete(nftId);
-            }
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      });
-    }
-
     if (isElectron()) {
       const { ipcRenderer } = window as unknown as { ipcRenderer: IpcRenderer };
 
       ipcRenderer.on('exit-daemon', handleClose);
-      ipcRenderer.on('removed-cache-file', handleRemovedCachedFile);
 
       // Handle files/URLs opened at launch now that the app is ready
       ipcRenderer.invoke('processLaunchTasks');
+
+      if (isTestnet && !updatedWindowTitle) {
+        ipcRenderer.invoke('setWindowTitle', 'HDDcoin Blockchain (Testnet)');
+        setUpdatedWindowTitle(true);
+      }
 
       return () => {
         // @ts-ignore
@@ -147,7 +160,7 @@ export default function AppState(props: Props) {
       };
     }
     return undefined;
-  }, [close, closing, lru]);
+  }, [close, closing, lru, isTestnet, updatedWindowTitle]);
 
   if (closing) {
     return (
@@ -177,7 +190,7 @@ export default function AppState(props: Props) {
     const backendVersionClean = backendVersion.replace(/[-+.]/g, '');
     const guiVersionClean = version.replace(/[-+.]/g, '');
 
-    if (backendVersionClean !== guiVersionClean) {
+    if (backendVersionClean !== guiVersionClean && process.env.NODE_ENV !== 'development') {
       return (
         <LayoutHero>
           <AppVersionWarning backV={backendVersion} guiV={version} setVersionDialog={setVersionDialog} />
@@ -255,7 +268,7 @@ export default function AppState(props: Props) {
               runServices.map((service) => (
                 <Collapse
                   key={service}
-                  in={!servicesState.running.find((state) => state.service === service)}
+                  in={!servicesState.running.includes(service)}
                   timeout={{ enter: 0, exit: 1000 }}
                 >
                   <Typography variant="body1" color="textSecondary" align="center">
@@ -271,3 +284,7 @@ export default function AppState(props: Props) {
 
   return <AppAutoLogin>{children}</AppAutoLogin>;
 }
+
+// AppState.whyDidYouRender = {
+//   logOnDifferentValues: true,
+// };

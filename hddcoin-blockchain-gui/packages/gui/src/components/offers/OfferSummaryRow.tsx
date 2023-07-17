@@ -166,11 +166,11 @@ export function OfferSummaryTokenRow(props: OfferSummaryTokenRowProps): React.Re
               <Box flexGrow={1}>
                 <StyledTitle>Name</StyledTitle>
               </Box>
-              {(!assetIdInfo || assetIdInfo?.walletType === WalletType.CAT) && (
-                {/* <Link href={`https://www.taildatabase.com/tail/${assetId.toLowerCase()}`} target="_blank">
+              {(!assetIdInfo || assetIdInfo?.walletType === WalletType.CAT) /* && (
+                <Link href={`https://www.taildatabase.com/tail/${assetId.toLowerCase()}`} target="_blank">
                   <Trans>Search on Tail Database</Trans>
-                </Link> */}
-              )}
+                </Link>
+              ) */ }
             </Flex>
 
             <StyledValue>{tooltipDisplayName}</StyledValue>

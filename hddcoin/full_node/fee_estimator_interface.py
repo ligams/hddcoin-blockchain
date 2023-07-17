@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing_extensions import Protocol
 
-from hddcoin.full_node.fee_estimation import FeeBlockInfo, FeeMempoolInfo
+from hddcoin.full_node.fee_estimation import FeeBlockInfo, FeeMempoolInfo, MempoolItemInfo
 from hddcoin.types.clvm_cost import CLVMCost
 from hddcoin.types.fee_rate import FeeRateV2
-from hddcoin.types.mempool_item import MempoolItem
 from hddcoin.util.ints import uint32
 
 
@@ -18,11 +17,11 @@ class FeeEstimatorInterface(Protocol):
         """A new transaction block has been added to the blockchain"""
         pass
 
-    def add_mempool_item(self, mempool_item_info: FeeMempoolInfo, mempool_item: MempoolItem) -> None:
+    def add_mempool_item(self, mempool_item_info: FeeMempoolInfo, mempool_item: MempoolItemInfo) -> None:
         """A MempoolItem (transaction and associated info) has been added to the mempool"""
         pass
 
-    def remove_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItem) -> None:
+    def remove_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItemInfo) -> None:
         """A MempoolItem (transaction and associated info) has been removed from the mempool"""
         pass
 

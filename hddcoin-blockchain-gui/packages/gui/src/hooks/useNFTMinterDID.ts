@@ -1,9 +1,8 @@
-import { useGetNFTInfoQuery } from '@hddcoin-network/api-react';
 import { useMemo } from 'react';
 
 import { didToDIDId } from '../util/dids';
-import { launcherIdFromNFTId } from '../util/nfts';
-import { stripHexPrefix } from '../util/utils';
+import removeHexPrefix from '../util/removeHexPrefix';
+import useNFT from './useNFT';
 
 export type UseNFTMinterDIDResult = {
   didId: string | undefined;
@@ -14,8 +13,7 @@ export type UseNFTMinterDIDResult = {
 };
 
 export default function useNFTMinterDID(nftId: string): UseNFTMinterDIDResult {
-  const launcherId = launcherIdFromNFTId(nftId);
-  const { data: nft, isLoading, error } = useGetNFTInfoQuery({ coinId: launcherId ?? '' });
+  const { nft, isLoading, error } = useNFT(nftId);
 
   const [didId, hexDIDId, didName] = useMemo(() => {
     if (!nft) {
@@ -25,7 +23,7 @@ export default function useNFTMinterDID(nftId: string): UseNFTMinterDIDResult {
     if (!minterDid) {
       return [];
     }
-    const hexDIDIdLocal = stripHexPrefix(minterDid);
+    const hexDIDIdLocal = removeHexPrefix(minterDid);
     const didIdLocal = didToDIDId(hexDIDIdLocal);
     let didNameLocal;
 

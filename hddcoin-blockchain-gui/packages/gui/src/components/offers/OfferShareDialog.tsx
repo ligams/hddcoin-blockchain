@@ -1,15 +1,10 @@
-import child_process from 'child_process';
-import fs from 'fs';
-import path from 'path';
-
 import { OfferTradeRecord } from '@hddcoin-network/api';
-import { usePrefs } from '@hddcoin-network/api-react';
 import {
   ButtonLoading,
   CopyToClipboard,
   DialogActions,
   Flex,
-  TooltipIcon,
+  Loading,
   useOpenDialog,
   useShowError,
   useOpenExternal,
@@ -21,7 +16,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  Divider,
   FormControlLabel,
   InputAdornment,
   TextField,
@@ -30,19 +24,12 @@ import {
 import debug from 'debug';
 import React, { useCallback, useEffect, useMemo } from 'react';
 
-import useAssetIdName, { AssetIdMapEntry } from '../../hooks/useAssetIdName';
-import { launcherIdToNFTId } from '../../util/nfts';
+import useResolveNFTOffer from '../../hooks/useResolveNFTOffer';
+import useSuppressShareOnCreate from '../../hooks/useSuppressShareOnCreate';
 import NotificationSendDialog from '../notification/NotificationSendDialog';
 import { NFTOfferSummary } from './NFTOfferViewer';
-import OfferAsset from './OfferAsset';
-import OfferLocalStorageKeys from './OfferLocalStorage';
 import OfferSummary from './OfferSummary';
-import {
-  offerAssetIdForAssetType,
-  offerContainsAssetOfType,
-  shortSummaryForOffer,
-  suggestedFilenameForOffer,
-} from './utils';
+import { offerContainsAssetOfType } from './utils';
 
 const log = debug('hddcoin-gui:offers');
 
@@ -52,10 +39,8 @@ enum OfferSharingService {
   Dexie = 'Dexie',
   Hashgreen = 'Hashgreen',
   MintGarden = 'MintGarden',
-  OfferBin = 'OfferBin',
   Offerpool = 'Offerpool',
   Spacescan = 'Spacescan',
-  Keybase = 'Keybase',
 }
 
 enum OfferSharingCapability {
@@ -84,9 +69,14 @@ type CommonDialogProps = {
 
 type CommonShareServiceDialogProps = CommonDialogProps & {
   // eslint-disable-next-line react/no-unused-prop-types -- False positive
-  isNFTOffer?: boolean;
+  address?: string;
   // eslint-disable-next-line react/no-unused-prop-types -- False positive
-  showSendOfferNotificationDialog?: (show: boolean, offerURL: string) => void;
+  showSendOfferNotificationDialog?: (
+    show: boolean,
+    offerURL: string,
+    notificationDestination: string,
+    notificationDestinationType: 'address' | 'nft'
+  ) => void;
 };
 
 type OfferShareServiceDialogProps = CommonOfferProps & CommonShareServiceDialogProps;
@@ -111,19 +101,9 @@ const OfferSharingProviders: {
     name: 'MintGarden',
     capabilities: [OfferSharingCapability.NFT],
   },
-  [OfferSharingService.OfferBin]: {
-    service: OfferSharingService.OfferBin,
-    name: 'OfferBin',
-    capabilities: [OfferSharingCapability.Token],
-  },
   [OfferSharingService.Offerpool]: {
     service: OfferSharingService.Offerpool,
     name: 'offerpool.io',
-    capabilities: [OfferSharingCapability.Token, OfferSharingCapability.NFT],
-  },
-  [OfferSharingService.Keybase]: {
-    service: OfferSharingService.Keybase,
-    name: 'Keybase',
     capabilities: [OfferSharingCapability.Token, OfferSharingCapability.NFT],
   },
   [OfferSharingService.Spacescan]: {
@@ -132,19 +112,6 @@ const OfferSharingProviders: {
     capabilities: [OfferSharingCapability.Token, OfferSharingCapability.NFT],
   },
 };
-
-/* ========================================================================== */
-
-async function writeTempOfferFile(offerData: string, filename: string): Promise<string> {
-  const { ipcRenderer } = window as any;
-  const tempRoot = await ipcRenderer?.invoke('getTempDir');
-  const tempPath = fs.mkdtempSync(path.join(tempRoot, 'offer'));
-  const filePath = path.join(tempPath, filename);
-
-  fs.writeFileSync(filePath, offerData);
-
-  return filePath;
-}
 
 /* ========================================================================== */
 
@@ -223,47 +190,6 @@ async function postToMintGarden(offerData: string, testnet: boolean): Promise<st
   } = JSON.parse(responseBody);
 
   return `https://${testnet ? 'testnet.' : ''}mintgarden.io/offers/${id}`;
-}
-
-// Posts the offer data to OfferBin and returns a URL to the offer.
-async function postToOfferBin(offerData: string, sharePrivately: boolean, testnet: boolean): Promise<string> {
-  const { ipcRenderer } = window as any;
-  const requestOptions = {
-    method: 'POST',
-    protocol: 'https:',
-    hostname: testnet ? testnetDummyHost : 'api.offerbin.io',
-    port: 443,
-    path: testnet
-      ? `/offerbin${sharePrivately ? '?private=true' : ''}`
-      : `/upload${sharePrivately ? '?private=true' : ''}`,
-  };
-  const requestHeaders = {
-    'Content-Type': 'application/text',
-  };
-  const requestData = offerData;
-  const { err, statusCode, statusMessage, responseBody } = await ipcRenderer.invoke(
-    'fetchTextResponse',
-    requestOptions,
-    requestHeaders,
-    requestData
-  );
-
-  if (err || statusCode !== 200) {
-    const error = new Error(
-      `OfferBin upload failed: ${err}, statusCode=${statusCode}, statusMessage=${statusMessage}, response=${responseBody}`
-    );
-    throw error;
-  }
-
-  log('OfferBin upload completed');
-
-  if (testnet) {
-    return 'https://www.hddcoin.org/offers';
-  }
-
-  const { hash } = JSON.parse(responseBody);
-
-  return `https://offerbin.io/offer/${hash}`;
 }
 
 enum HashgreenErrorCodes {
@@ -348,7 +274,7 @@ type PostToSpacescanResponse = {
   offer_link: string;
 };
 
-// Posts the offer data to OfferBin and returns a URL to the offer.
+// Posts the offer data to SpaceScan and returns a URL to the offer.
 async function postToSpacescan(offerData: string, testnet: boolean): Promise<{ viewLink: string; offerLink: string }> {
   const { ipcRenderer } = window as any;
   const requestOptions = {
@@ -381,129 +307,6 @@ async function postToSpacescan(offerData: string, testnet: boolean): Promise<{ v
   const { view_link: viewLink, offer_link: offerLink }: PostToSpacescanResponse = JSON.parse(responseBody);
 
   return { viewLink, offerLink };
-}
-
-enum KeybaseCLIActions {
-  JOIN_TEAM = 'JOIN_TEAM',
-  JOIN_CHANNEL = 'JOIN_CHANNEL',
-  UPLOAD_OFFER = 'UPLOAD_OFFER',
-  CHECK_TEAM_MEMBERSHIP = 'CHECK_TEAM_MEMBERSHIP',
-}
-
-type KeybaseCLIRequest = {
-  action: KeybaseCLIActions;
-  uploadArgs?: {
-    title: string;
-    filePath: string;
-  };
-  teamName: string;
-  channelName: string;
-};
-
-const KeybaseTeamName = 'hddcoin_offers';
-const KeybaseChannelName = 'offers-trading';
-
-async function execKeybaseCLI(request: KeybaseCLIRequest): Promise<boolean> {
-  const { action, uploadArgs, teamName, channelName } = request;
-
-  return new Promise((resolve, reject) => {
-    try {
-      const options: any = {};
-
-      if (process.platform === 'darwin') {
-        const env = { ...process.env };
-
-        // Add /usr/local/bin and a direct path to the keybase binary on macOS.
-        // Without these additions, the keybase binary may not be found.
-        env.PATH = `${env.PATH}:/usr/local/bin:/Applications/Keybase.app/Contents/SharedSupport/bin`;
-
-        options.env = env;
-      }
-
-      let command: string | undefined;
-
-      switch (action) {
-        case KeybaseCLIActions.JOIN_TEAM:
-          command = `keybase team request-access ${teamName}`;
-          break;
-        case KeybaseCLIActions.JOIN_CHANNEL:
-          command = `keybase chat join-channel ${teamName} '#${channelName}'`;
-          break;
-        case KeybaseCLIActions.UPLOAD_OFFER:
-          if (uploadArgs?.title && uploadArgs?.filePath) {
-            command = `keybase chat upload "${teamName}" --channel "${channelName}" --title "${uploadArgs.title}" "${uploadArgs.filePath}"`;
-          } else {
-            reject(new Error(`Missing title or filePath in uploadArgs`));
-          }
-          break;
-        case KeybaseCLIActions.CHECK_TEAM_MEMBERSHIP:
-          command = 'keybase team list-memberships';
-          break;
-        default:
-          reject(new Error(`Unknown KeybaseCLI action: ${action}`));
-          break;
-      }
-
-      if (command) {
-        child_process.exec(command, options, (error, stdout, stderr) => {
-          if (error) {
-            console.error(`Keybase error: ${error}`);
-            switch (action) {
-              case KeybaseCLIActions.CHECK_TEAM_MEMBERSHIP:
-                resolve(stdout.indexOf(`${teamName}`) === 0);
-                break;
-              case KeybaseCLIActions.JOIN_TEAM:
-                resolve(stderr.indexOf('(code 2665)') !== -1);
-                break;
-              default:
-                if (stderr.indexOf('(code 2623)') !== -1) {
-                  resolve(false);
-                } else {
-                  reject(new Error(t`Failed to execute Keybase command: ${stderr}`));
-                }
-            }
-          }
-
-          resolve(true);
-        });
-      } else {
-        reject(new Error(`Missing command for action: ${action}`));
-      }
-    } catch (error) {
-      console.error(error);
-      reject(error);
-    }
-  });
-}
-
-async function postToKeybase(
-  offerRecord: OfferTradeRecord,
-  offerData: string,
-  teamName: string,
-  channelName: string,
-  lookupByAssetId: (assetId: string) => AssetIdMapEntry | undefined
-): Promise<boolean> {
-  const filename = suggestedFilenameForOffer(offerRecord.summary, lookupByAssetId);
-  const summary = shortSummaryForOffer(offerRecord.summary, lookupByAssetId);
-
-  let filePath = '';
-  let success = false;
-
-  filePath = await writeTempOfferFile(offerData, filename);
-
-  try {
-    success = await execKeybaseCLI({
-      action: KeybaseCLIActions.UPLOAD_OFFER,
-      uploadArgs: { title: summary, filePath },
-      teamName,
-      channelName,
-    });
-  } finally {
-    if (filePath) {
-      fs.unlinkSync(filePath);
-    }
-  }
-  return success;
 }
 
 type PostToOfferpoolResponse = {
@@ -561,12 +364,21 @@ function OfferShareDexieDialog(props: OfferShareServiceDialogProps) {
     testnet = false,
     onClose = () => {},
     open = false,
-    isNFTOffer = false,
+    address,
     showSendOfferNotificationDialog = () => {},
   } = props;
   const openExternal = useOpenExternal();
   const [sharedURL, setSharedURL] = React.useState('');
   const [rawOfferURL, setRawOfferURL] = React.useState('');
+
+  const { isResolving, unownedNFTIds } = useResolveNFTOffer({
+    offerSummary: offerRecord.summary,
+  });
+
+  const [nftId] = unownedNFTIds ?? [];
+
+  const notificationDestination = address || nftId;
+  const notificationDestinationType = address ? 'address' : 'nft';
 
   function handleClose() {
     onClose(false);
@@ -581,7 +393,7 @@ function OfferShareDexieDialog(props: OfferShareServiceDialogProps) {
   }
 
   function handleShowSendOfferNotificationDialog() {
-    showSendOfferNotificationDialog(true, rawOfferURL);
+    showSendOfferNotificationDialog(true, rawOfferURL, notificationDestination, notificationDestinationType);
   }
 
   if (sharedURL) {
@@ -621,14 +433,24 @@ function OfferShareDexieDialog(props: OfferShareServiceDialogProps) {
           </Flex>
         </DialogContent>
         <DialogActions>
-          {isNFTOffer && (
-            <Button onClick={handleShowSendOfferNotificationDialog} color="primary" variant="outlined">
-              <Trans>Notify Current Owner</Trans>
-            </Button>
+          {isResolving ? (
+            <Loading center />
+          ) : (
+            <>
+              {notificationDestination && (
+                <Button onClick={handleShowSendOfferNotificationDialog} color="primary" variant="outlined">
+                  {notificationDestinationType === 'nft' ? (
+                    <Trans>Notify Current Owner</Trans>
+                  ) : (
+                    <Trans>Send Notification</Trans>
+                  )}
+                </Button>
+              )}
+              <Button onClick={handleClose} color="primary" variant="contained">
+                <Trans>Close</Trans>
+              </Button>
+            </>
           )}
-          <Button onClick={handleClose} color="primary" variant="contained">
-            <Trans>Close</Trans>
-          </Button>
         </DialogActions>
       </Dialog>
     );
@@ -720,99 +542,6 @@ function OfferShareMintGardenDialog(props: OfferShareServiceDialogProps) {
   );
 }
 
-function OfferShareOfferBinDialog(props: OfferShareServiceDialogProps) {
-  const { offerRecord, offerData, testnet = false, onClose = () => {}, open = false } = props;
-  const openExternal = useOpenExternal();
-  const [sharePrivately, setSharePrivately] = React.useState(false);
-  const [sharedURL, setSharedURL] = React.useState('');
-
-  function handleClose() {
-    onClose(false);
-  }
-
-  async function handleConfirm() {
-    const url = await postToOfferBin(offerData, sharePrivately, testnet);
-    log(`OfferBin URL (private=${sharePrivately}): ${url}`);
-    setSharedURL(url);
-  }
-
-  if (sharedURL) {
-    return (
-      <Dialog
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-        maxWidth="xs"
-        open={open}
-        onClose={handleClose}
-        fullWidth
-      >
-        <DialogTitle>
-          <Trans>Offer Shared</Trans>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Flex flexDirection="column" gap={3} sx={{ paddingTop: '1em' }}>
-            <TextField
-              label={<Trans>OfferBin URL</Trans>}
-              value={sharedURL}
-              variant="filled"
-              InputProps={{
-                readOnly: true,
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <CopyToClipboard value={sharedURL} />
-                  </InputAdornment>
-                ),
-              }}
-              fullWidth
-            />
-            <Flex>
-              <Button variant="outlined" onClick={() => openExternal(sharedURL)}>
-                <Trans>View on OfferBin</Trans>
-              </Button>
-            </Flex>
-          </Flex>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose} color="primary" variant="contained">
-            <Trans>Close</Trans>
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
-  }
-
-  return (
-    <OfferShareConfirmationDialog
-      offerRecord={offerRecord}
-      offerData={offerData}
-      testnet={testnet}
-      title={<Trans>Share on OfferBin</Trans>}
-      onConfirm={handleConfirm}
-      open={open}
-      onClose={onClose}
-      actions={
-        <FormControlLabel
-          control={
-            <Checkbox
-              name="sharePrivately"
-              checked={sharePrivately}
-              onChange={(event) => setSharePrivately(event.target.checked)}
-            />
-          }
-          label={
-            <>
-              <Trans>Share Privately</Trans>{' '}
-              <TooltipIcon>
-                <Trans>If selected, your offer will be not be shared publicly.</Trans>
-              </TooltipIcon>
-            </>
-          }
-        />
-      }
-    />
-  );
-}
-
 function OfferShareHashgreenDialog(props: OfferShareServiceDialogProps) {
   const { offerRecord, offerData, testnet = false, onClose = () => {}, open = false } = props;
   const openExternal = useOpenExternal();
@@ -893,12 +622,21 @@ function OfferShareSpacescanDialog(props: OfferShareServiceDialogProps) {
     testnet = false,
     onClose = () => {},
     open = false,
-    isNFTOffer = false,
+    address,
     showSendOfferNotificationDialog = () => {},
   } = props;
   const openExternal = useOpenExternal();
   const [sharedURL, setSharedURL] = React.useState('');
   const [rawOfferURL, setRawOfferURL] = React.useState('');
+
+  const { isResolving, unownedNFTIds } = useResolveNFTOffer({
+    offerSummary: offerRecord.summary,
+  });
+
+  const [nftId] = unownedNFTIds ?? [];
+
+  const notificationDestination = address || nftId;
+  const notificationDestinationType = address ? 'address' : 'nft';
 
   function handleClose() {
     onClose(false);
@@ -913,7 +651,7 @@ function OfferShareSpacescanDialog(props: OfferShareServiceDialogProps) {
   }
 
   function handleShowSendOfferNotificationDialog() {
-    showSendOfferNotificationDialog(true, rawOfferURL);
+    showSendOfferNotificationDialog(true, rawOfferURL, notificationDestination, notificationDestinationType);
   }
 
   if (sharedURL) {
@@ -953,15 +691,24 @@ function OfferShareSpacescanDialog(props: OfferShareServiceDialogProps) {
           </Flex>
         </DialogContent>
         <DialogActions>
-          {' '}
-          {isNFTOffer && (
-            <Button onClick={handleShowSendOfferNotificationDialog} color="primary" variant="outlined">
-              <Trans>Notify Current Owner</Trans>
-            </Button>
+          {isResolving ? (
+            <Loading center />
+          ) : (
+            <>
+              {notificationDestination && (
+                <Button onClick={handleShowSendOfferNotificationDialog} color="primary" variant="outlined">
+                  {notificationDestinationType === 'nft' ? (
+                    <Trans>Notify Current Owner</Trans>
+                  ) : (
+                    <Trans>Send Notification</Trans>
+                  )}
+                </Button>
+              )}
+              <Button onClick={handleClose} color="primary" variant="contained">
+                <Trans>Close</Trans>
+              </Button>
+            </>
           )}
-          <Button onClick={handleClose} color="primary" variant="contained">
-            <Trans>Close</Trans>
-          </Button>
         </DialogActions>
       </Dialog>
     );
@@ -980,228 +727,6 @@ function OfferShareSpacescanDialog(props: OfferShareServiceDialogProps) {
   );
 }
 
-function OfferShareKeybaseDialog(props: OfferShareServiceDialogProps) {
-  const { offerRecord, offerData, testnet, onClose = () => {}, open = false } = props;
-  const { lookupByAssetId } = useAssetIdName();
-  const showError = useShowError();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isJoiningTeam, setIsJoiningTeam] = React.useState(false);
-  const [shared, setShared] = React.useState(false);
-  const teamName = testnet ? 'testhddoffersdev' : KeybaseTeamName;
-  const channelName = testnet ? 'offers' : KeybaseChannelName;
-
-  function handleClose() {
-    onClose(false);
-  }
-
-  async function handleKeybaseInstall() {
-    try {
-      const { shell } = window as any;
-      await shell.openExternal('https://keybase.io/download');
-    } catch (e) {
-      showError(new Error(t`Unable to open browser. Install Keybase from https://keybase.io`));
-    }
-  }
-
-  async function handleKeybaseJoinTeam() {
-    setIsJoiningTeam(true);
-
-    try {
-      const { shell } = window as any;
-      const joinTeamSucceeded = await execKeybaseCLI({
-        action: KeybaseCLIActions.JOIN_TEAM,
-        teamName,
-        channelName,
-      });
-      let joinTeamThroughURL = false;
-      if (joinTeamSucceeded) {
-        let attempts = 0;
-        let isMember = false;
-        while (attempts < 20) {
-          // eslint-disable-next-line no-await-in-loop -- Intentionally sequential
-          await new Promise((resolve) => {
-            setTimeout(resolve, 1000);
-          });
-          // eslint-disable-next-line no-await-in-loop -- Intentionally sequential
-          isMember = await execKeybaseCLI({
-            action: KeybaseCLIActions.CHECK_TEAM_MEMBERSHIP,
-            teamName,
-            channelName,
-          });
-
-          if (isMember) {
-            log('Joined team successfully');
-            break;
-          }
-
-          attempts++;
-        }
-
-        if (isMember) {
-          attempts = 0;
-          let joinChannelSucceeded = false;
-          while (attempts < 30) {
-            // eslint-disable-next-line no-await-in-loop -- Intentionally sequential
-            await new Promise((resolve) => {
-              setTimeout(resolve, 1000);
-            });
-            // eslint-disable-next-line no-await-in-loop -- Intentionally sequential
-            joinChannelSucceeded = await execKeybaseCLI({
-              action: KeybaseCLIActions.JOIN_CHANNEL,
-              teamName,
-              channelName,
-            });
-
-            if (joinChannelSucceeded) {
-              break;
-            }
-
-            attempts++;
-          }
-
-          if (joinChannelSucceeded) {
-            log('Joined channel successfully');
-            await new Promise((resolve) => {
-              setTimeout(resolve, 1000);
-            });
-            await shell.openExternal(`keybase://chat/${teamName}#${channelName}`);
-          } else {
-            console.error('Failed to join channel');
-            shell.openExternal(`keybase://chat/${teamName}#${channelName}`);
-          }
-        } else {
-          console.error('Failed to join team');
-          joinTeamThroughURL = true;
-        }
-      } else {
-        joinTeamThroughURL = true;
-      }
-
-      if (joinTeamThroughURL) {
-        await shell.openExternal(`keybase://team-page/${teamName}/join`);
-      }
-    } catch (e) {
-      showError(
-        new Error(
-          t`Keybase command failed ${e}. If you haven't installed Keybase, you can download from https://keybase.io`
-        )
-      );
-    } finally {
-      setIsJoiningTeam(false);
-    }
-  }
-
-  async function handleKeybaseGoToChannel() {
-    try {
-      const { shell } = window as any;
-      await shell.openExternal(`keybase://chat/${teamName}#${channelName}`);
-    } catch (e) {
-      showError(new Error(t`Unable to open Keybase. Install Keybase from https://keybase.io`));
-    }
-  }
-
-  async function handleKeybaseShare() {
-    let success = false;
-
-    try {
-      setIsSubmitting(true);
-      success = await postToKeybase(offerRecord, offerData, teamName, channelName, lookupByAssetId);
-
-      if (success) {
-        setShared(true);
-      }
-    } catch (e) {
-      showError(e);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  if (shared) {
-    return (
-      <Dialog
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-        maxWidth="xs"
-        open={open}
-        onClose={handleClose}
-        fullWidth
-      >
-        <DialogTitle>
-          <Trans>Offer Shared</Trans>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Flex flexDirection="column" gap={3} sx={{ paddingTop: '1em' }}>
-            <Trans>Your offer has been successfully posted to Keybase.</Trans>
-          </Flex>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleKeybaseGoToChannel} variant="outlined">
-            <Trans>Go to #{channelName}</Trans>
-          </Button>
-          <Button onClick={handleClose} color="primary" variant="contained">
-            <Trans>Close</Trans>
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
-  }
-
-  return (
-    <Dialog
-      onClose={handleClose}
-      aria-labelledby="alert-dialog-title"
-      aria-describedby="alert-dialog-description"
-      maxWidth="sm"
-      open={open}
-      fullWidth
-    >
-      <DialogTitle id="alert-dialog-title">
-        <Trans>Share on Keybase</Trans>
-      </DialogTitle>
-      <DialogContent dividers>
-        <Flex flexDirection="column" gap={2}>
-          <Typography variant="body2">
-            <Trans>
-              Keybase is a secure messaging and file sharing application. To share an offer in the Keybase {teamName}{' '}
-              team, you must first have Keybase installed.
-            </Trans>
-          </Typography>
-          <Flex justifyContent="center" flexGrow={0}>
-            <Button onClick={handleKeybaseInstall} variant="outlined">
-              <Trans>Install Keybase</Trans>
-            </Button>
-          </Flex>
-          <Divider />
-          <Typography variant="body2">
-            <Trans>
-              Before posting an offer in Keybase to the #{channelName} channel, you must first join the {teamName} team.
-              Please note that it might take a few moments to join the channel.
-            </Trans>
-          </Typography>
-          <Flex justifyContent="center" flexGrow={0}>
-            <ButtonLoading onClick={handleKeybaseJoinTeam} variant="outlined" loading={isJoiningTeam}>
-              <Trans>Join {teamName}</Trans>
-            </ButtonLoading>
-          </Flex>
-        </Flex>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleKeybaseGoToChannel} color="primary" variant="contained">
-          <Trans>Go to #{channelName}</Trans>
-        </Button>
-        <Flex flexGrow={1} />
-        <Button onClick={handleClose} color="primary" variant="contained" disabled={isSubmitting}>
-          <Trans>Cancel</Trans>
-        </Button>
-        <ButtonLoading onClick={handleKeybaseShare} variant="outlined" loading={isSubmitting}>
-          <Trans>Share</Trans>
-        </ButtonLoading>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
 function OfferShareOfferpoolDialog(props: OfferShareServiceDialogProps) {
   const {
     offerRecord,
@@ -1209,11 +734,20 @@ function OfferShareOfferpoolDialog(props: OfferShareServiceDialogProps) {
     testnet = false,
     onClose = () => {},
     open = false,
-    isNFTOffer = false,
+    address,
     showSendOfferNotificationDialog = () => {},
   } = props;
   const openExternal = useOpenExternal();
   const [offerResponse, setOfferResponse] = React.useState<PostToOfferpoolResponse>();
+
+  const { isResolving, unownedNFTIds } = useResolveNFTOffer({
+    offerSummary: offerRecord.summary,
+  });
+
+  const [nftId] = unownedNFTIds ?? [];
+
+  const notificationDestination = address || nftId;
+  const notificationDestinationType = address ? 'address' : 'nft';
 
   function handleClose() {
     onClose(false);
@@ -1227,7 +761,12 @@ function OfferShareOfferpoolDialog(props: OfferShareServiceDialogProps) {
 
   function handleShowSendOfferNotificationDialog() {
     if (offerResponse) {
-      showSendOfferNotificationDialog(true, offerResponse.offerLink);
+      showSendOfferNotificationDialog(
+        true,
+        offerResponse.offerLink,
+        notificationDestination,
+        notificationDestinationType
+      );
     }
   }
 
@@ -1274,14 +813,24 @@ function OfferShareOfferpoolDialog(props: OfferShareServiceDialogProps) {
           </Flex>
         </DialogContent>
         <DialogActions>
-          {isNFTOffer && (
-            <Button onClick={handleShowSendOfferNotificationDialog} color="primary" variant="outlined">
-              <Trans>Notify Current Owner</Trans>
-            </Button>
+          {isResolving ? (
+            <Loading center />
+          ) : (
+            <>
+              {notificationDestination && (
+                <Button onClick={handleShowSendOfferNotificationDialog} color="primary" variant="outlined">
+                  {notificationDestinationType === 'nft' ? (
+                    <Trans>Notify Current Owner</Trans>
+                  ) : (
+                    <Trans>Send Notification</Trans>
+                  )}
+                </Button>
+              )}
+              <Button onClick={handleClose} color="primary" variant="contained">
+                <Trans>Close</Trans>
+              </Button>
+            </>
           )}
-          <Button onClick={handleClose} color="primary" variant="contained">
-            <Trans>Close</Trans>
-          </Button>
         </DialogActions>
       </Dialog>
     );
@@ -1405,26 +954,33 @@ export default function OfferShareDialog(props: OfferShareDialogProps) {
   const openDialog = useOpenDialog();
   const [sendOfferNotificationOpen, setSendOfferNotificationOpen] = React.useState(false);
   const [offerURL, setOfferURL] = React.useState('');
-  const [suppressShareOnCreate, setSuppressShareOnCreate] = usePrefs<boolean>(
-    OfferLocalStorageKeys.SUPPRESS_SHARE_ON_CREATE
-  );
+  const [suppressShareOnCreate, setSuppressShareOnCreate] = useSuppressShareOnCreate();
+
   const isNFTOffer = offerContainsAssetOfType(offerRecord.summary, 'singleton');
-  const nftLauncherId = isNFTOffer ? offerAssetIdForAssetType(OfferAsset.NFT, offerRecord.summary) : undefined;
-  const nftId = nftLauncherId ? launcherIdToNFTId(nftLauncherId) : undefined;
+
+  const [notificationDestination, setNotificationDestination] = React.useState<string | undefined>(undefined);
+  const [notificationDestinationType, setNotificationDestinationType] = React.useState<'address' | 'nft'>('address');
 
   const showSendOfferNotificationDialog = useCallback(
-    (localOpen: boolean, localOfferURL: string) => {
+    (
+      localOpen: boolean,
+      localOfferURL: string,
+      localNotificationDestination: string,
+      localNotificationDestinationType: 'address' | 'nft'
+    ) => {
       setOfferURL(localOfferURL);
+      setNotificationDestination(localNotificationDestination);
+      setNotificationDestinationType(localNotificationDestinationType);
       setSendOfferNotificationOpen(localOpen);
     },
-    [setOfferURL, setSendOfferNotificationOpen]
+    [setOfferURL, setSendOfferNotificationOpen, setNotificationDestination, setNotificationDestinationType]
   );
 
   const shareOptions: OfferShareDialogProvider[] = useMemo(() => {
     const capabilities = isNFTOffer ? [OfferSharingCapability.NFT] : [OfferSharingCapability.Token];
     const commonDialogProps: CommonShareServiceDialogProps = {
       showSendOfferNotificationDialog,
-      isNFTOffer,
+      address,
     };
 
     const dialogComponents: {
@@ -1441,16 +997,8 @@ export default function OfferShareDialog(props: OfferShareDialogProps) {
         component: OfferShareHashgreenDialog,
         props: commonDialogProps,
       },
-      ...(testnet
-        ? {
-            [OfferSharingService.MintGarden]: {
-              component: OfferShareMintGardenDialog,
-              props: commonDialogProps,
-            },
-          }
-        : {}),
-      [OfferSharingService.OfferBin]: {
-        component: OfferShareOfferBinDialog,
+      [OfferSharingService.MintGarden]: {
+        component: OfferShareMintGardenDialog,
         props: commonDialogProps,
       },
       [OfferSharingService.Offerpool]: {
@@ -1459,10 +1007,6 @@ export default function OfferShareDialog(props: OfferShareDialogProps) {
       },
       [OfferSharingService.Spacescan]: {
         component: OfferShareSpacescanDialog,
-        props: commonDialogProps,
-      },
-      [OfferSharingService.Keybase]: {
-        component: OfferShareKeybaseDialog,
         props: commonDialogProps,
       },
     };
@@ -1482,14 +1026,20 @@ export default function OfferShareDialog(props: OfferShareDialogProps) {
       });
 
     return options;
-  }, [isNFTOffer, testnet, showSendOfferNotificationDialog]);
+  }, [isNFTOffer, showSendOfferNotificationDialog, address]);
 
   useEffect(() => {
-    if (sendOfferNotificationOpen && offerURL && nftId) {
-      openDialog(<NotificationSendDialog offerURL={offerURL} nftId={nftId} address={address} />);
+    if (sendOfferNotificationOpen && offerURL && notificationDestination && notificationDestinationType) {
+      openDialog(
+        <NotificationSendDialog
+          offerURL={offerURL}
+          destination={notificationDestination}
+          destinationType={notificationDestinationType}
+        />
+      );
       setSendOfferNotificationOpen(false);
     }
-  }, [openDialog, sendOfferNotificationOpen, offerURL, nftId, address]);
+  }, [openDialog, sendOfferNotificationOpen, offerURL, notificationDestination, notificationDestinationType]);
 
   function handleClose() {
     onClose(false);

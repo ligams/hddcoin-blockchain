@@ -8,7 +8,7 @@ import { useParams } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { didToDIDId } from '../../util/dids';
-import { stripHexPrefix } from '../../util/utils';
+import removeHexPrefix from '../../util/removeHexPrefix';
 
 const StyledCard = styled(Card)(
   ({ theme }) => `
@@ -76,12 +76,12 @@ export default function ProfileView() {
   if (did && didName) {
     const nameText = didName.name;
     const didID = didToDIDId(did.myDid);
-    const hexDID = stripHexPrefix(fromBech32m(didID));
+    const hexDID = removeHexPrefix(fromBech32m(didID));
     const truncatedDID = truncateValue(didID, {});
 
     return (
       <div style={{ width: '100%' }}>
-        <StyledCard>
+        <StyledCard sx={{ marginTop: '-16px' }}>
           <Flex flexDirection="column" gap={2.5} paddingBottom={3}>
             <InlineEdit text={nameText} walletId={walletId} />
           </Flex>

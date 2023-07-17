@@ -45,6 +45,10 @@ export default {
       main: '#424242',
       dark: 'white',
     },
+    info: {
+      main: '#757575',
+      dark: '#fff',
+    },
   },
   drawer: {
     width: '72px',

@@ -9,8 +9,8 @@ import {
   SelectProps as MaterialSelectProps,
   Typography,
 } from '@mui/material';
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { Controller, useFormContext } from 'react-hook-form';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Controller, useFormContext, useWatch } from 'react-hook-form';
 
 import useCurrencyCode from '../../hooks/useCurrencyCode';
 import useLocale from '../../hooks/useLocale';
@@ -48,6 +48,7 @@ function Select(props: SelectProps) {
     onTypeChange,
     onTimeChange,
     onValueChange,
+    currencyCode,
     children,
     ...rest
   } = props;
@@ -57,6 +58,7 @@ function Select(props: SelectProps) {
     setValue,
   } = useFormContext();
   const haveError = Object.keys(errors).length > 0;
+  const displayedTime = selectedTime === -1 ? t`(>5 min)` : t`(~${selectedTime} min)`;
 
   return (
     <Controller
@@ -88,7 +90,12 @@ function Select(props: SelectProps) {
           error={haveError}
           renderValue={() => (
             <Box sx={{ display: 'flex', gap: 1 }}>
-              {selectedValue} (~{selectedTime} min)
+              <Box sx={{ flexGrow: 1 }}>
+                {selectedValue} {displayedTime}
+              </Box>
+              <Box sx={{ position: 'relative', top: '-8px' }}>
+                <Typography color="textSecondary">{currencyCode}</Typography>
+              </Box>
             </Box>
           )}
           {...rest}
@@ -147,17 +154,16 @@ function CountdownBar({ startTime, refreshSeconds }: { startTime: number; refres
   );
 }
 
-enum FeeTxType {
-  walletSendHDD = 'walletSendHDD',
-  spendCATtx = 'spendCATtx',
-  acceptOffer = 'acceptOffer',
-  cancelOffer = 'cancelOffer',
-  burnNFT = 'burnNFT',
-  assignDIDToNFT = 'assignDIDToNFT',
-  transferNFT = 'transferNFT',
-  createPlotNFT = 'createPlotNFT',
-  claimPoolingReward = 'claimPoolingReward',
-  createDID = 'createDID',
+export enum FeeTxType {
+  walletSendHDD = 'send_hdd_transaction',
+  spendCATtx = 'cat_spend',
+  acceptOffer = 'take_offer',
+  cancelOffer = 'cancel_offer',
+  assignDIDToNFT = 'nft_set_nft_did',
+  transferNFT = 'nft_transfer_nft',
+  createPlotNFT = 'create_new_pool_wallet',
+  claimPoolingReward = 'pw_absorb_rewards',
+  createDID = 'create_new_did_wallet',
 }
 
 type FeeProps = {
@@ -172,69 +178,53 @@ export default function EstimatedFee(props: FeeProps) {
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [startTime, setStartTime] = useState<number | undefined>(undefined);
   const result = useGetFeeEstimateQuery(
-    { targetTimes: TARGET_TIMES, cost: 1 },
+    { targetTimes: TARGET_TIMES, spendType: txType },
     {
       pollingInterval: REFRESH_SECONDS * 1000, // in milliseconds
     }
   );
   const { data: ests, isLoading, isSuccess, requestId: feeEstimateRequestId, startedTimeStamp } = result;
 
-  const [inputType, setInputType] = React.useState('dropdown');
+  const currentValue = useWatch({ name, defaultValue: '' });
+  const isCustom = currentValue !== '';
+
+  const [inputType, setInputType] = React.useState(isCustom ? 'custom' : 'dropdown');
+  const [defaultFee, setDefaultFee] = React.useState(false);
   const [selectedValue, setSelectedValue] = React.useState('');
   const [selectedTime, setSelectedTime] = React.useState(0);
   const [selectOpen, setSelectOpen] = React.useState(false);
   const [locale] = useLocale();
   const currencyCode = useCurrencyCode();
 
-  const maxBlockCostCLVM = 11_000_000_000;
-
-  const txCostEstimates = {
-    walletSendHDD: Math.floor(maxBlockCostCLVM / 1170),
-    spendCATtx: 36_382_111,
-    acceptOffer: 721_393_265,
-    cancelOffer: 212_443_993,
-    burnNFT: 74_385_541,
-    assignDIDToNFT: 115_540_006,
-    transferNFT: 74_385_541,
-    createPlotNFT: 18_055_407,
-    claimPoolingReward: 82_668_466,
-    createDID: 57_360_396,
-  };
-
-  const multiplier = txCostEstimates[txType];
-
-  const multiplyEstimate = useCallback((estimate: number, multiplierLocal: number) => {
-    const num = Math.round(estimate * multiplierLocal * 10 ** -4) * 10 ** 4;
-    return num;
-  }, []);
-
-  const formatEst = useCallback(
-    (number: number, multiplierLocal: number, localeLocal: string) => {
-      const num = multiplyEstimate(number, multiplierLocal);
-      return byteToHDDcoinLocaleString(num, localeLocal);
-    },
-    [multiplyEstimate]
-  );
-
   const formattedEstimates: FormattedEstimate[] = useMemo(() => {
     const estimateList = ests?.estimates ?? [0, 0, 0];
     const defaultValues = [6_000_000, 5_000_000, 0];
     const allZeroes = estimateList.filter((value: number) => value !== 0).length === 0;
+    const estList = allZeroes // update estimate list to include a 0 fee entry if not already present
+      ? defaultValues.some((val) => val === 0)
+        ? defaultValues
+        : defaultValues.concat([0])
+      : estimateList.some((val) => val === 0)
+      ? estimateList
+      : estimateList.concat([0]);
 
-    return (allZeroes ? defaultValues : estimateList).map((estimate: number, i: number) => {
-      const multiplierLocal = allZeroes ? 1 : multiplier;
-      const multipliedEstimate = multiplyEstimate(estimate, multiplierLocal);
-      const formattedEstimate = formatEst(estimate, multiplierLocal, locale);
-      const minutes = TARGET_TIMES[i] / 60;
+    return estList.map((estimate: number, i: number) => {
+      const formattedEstimate = byteToHDDcoinLocaleString(estimate, locale);
+      const minutes = i === 3 ? -1 : TARGET_TIMES[i] / 60; // -1 designates a conditionally-added fourth dropdown selection with 0 fee and >5 minutes
 
       return {
         minutes,
-        timeDescription: minutes > 1 ? t`Likely in ${minutes} minutes` : t`Likely in ${TARGET_TIMES[i]} seconds`,
-        estimate: multipliedEstimate,
+        timeDescription:
+          minutes > 1
+            ? t`Likely in ${minutes} minutes`
+            : minutes === -1
+            ? t`Likely in >5 minutes`
+            : t`Likely in ${TARGET_TIMES[i]} seconds`,
+        estimate,
         formattedEstimate,
       };
     });
-  }, [ests, locale, multiplier, formatEst, multiplyEstimate]);
+  }, [ests, locale]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -248,7 +238,15 @@ export default function EstimatedFee(props: FeeProps) {
   }, [requestId, setRequestId, feeEstimateRequestId, startedTimeStamp, isLoading, isSuccess]);
 
   useEffect(() => {
-    if (formattedEstimates) {
+    if (formattedEstimates && inputType === 'dropdown') {
+      if (!defaultFee && !isLoading) {
+        const defaultVal = formattedEstimates.find((formattedEstimate) => formattedEstimate.estimate === 0);
+        if (defaultVal) {
+          setSelectedValue(defaultVal.estimate);
+          setSelectedTime(defaultVal.minutes);
+        }
+        setDefaultFee(true);
+      }
       if (selectedTime) {
         const estimate = formattedEstimates.find((formattedEstimate) => formattedEstimate.minutes === selectedTime);
         if (estimate) {
@@ -258,7 +256,7 @@ export default function EstimatedFee(props: FeeProps) {
         }
       }
     }
-  }, [formattedEstimates, name, selectedTime, setValue]);
+  }, [formattedEstimates, name, selectedTime, setValue, defaultFee, isLoading, inputType]);
 
   const handleSelectOpen = () => {
     setSelectOpen(true);
@@ -286,6 +284,7 @@ export default function EstimatedFee(props: FeeProps) {
             formattedEstimates={formattedEstimates}
             selectedValue={selectedValue}
             selectedTime={selectedTime}
+            currencyCode={currencyCode}
             {...rest}
           >
             {formattedEstimates.map((formattedEstimate) => (

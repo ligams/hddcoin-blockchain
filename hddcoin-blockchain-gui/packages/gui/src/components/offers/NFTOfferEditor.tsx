@@ -1,12 +1,6 @@
 import { WalletType } from '@hddcoin-network/api';
-import type { NFTInfo, Wallet } from '@hddcoin-network/api';
-import {
-  useCreateOfferForIdsMutation,
-  useGetNFTInfoQuery,
-  useGetNFTWallets,
-  useGetWalletBalanceQuery,
-  usePrefs,
-} from '@hddcoin-network/api-react';
+import type { NFTInfo } from '@hddcoin-network/api';
+import { useCreateOfferForIdsMutation, useGetWalletBalanceQuery } from '@hddcoin-network/api-react';
 import {
   Amount,
   AmountProps,
@@ -42,13 +36,14 @@ import { useForm, useFormContext } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
-import useFetchNFTs from '../../hooks/useFetchNFTs';
+import useNFT from '../../hooks/useNFT';
+import useNFTs from '../../hooks/useNFTs';
+import useSuppressShareOnCreate from '../../hooks/useSuppressShareOnCreate';
 import { convertRoyaltyToPercentage, isValidNFTId, launcherIdFromNFTId } from '../../util/nfts';
 import NFTOfferExchangeType from './NFTOfferExchangeType';
 import NFTOfferPreview from './NFTOfferPreview';
 import NFTOfferTokenSelector from './NFTOfferTokenSelector';
 import OfferEditorConfirmationDialog from './OfferEditorConfirmationDialog';
-import OfferLocalStorageKeys from './OfferLocalStorage';
 import { calculateNFTRoyalties } from './utils';
 
 /* ========================================================================== */
@@ -121,7 +116,7 @@ function NFTOfferConditionalsPanel(props: NFTOfferConditionalsPanelProps) {
   const makerFee = methods.watch('fee');
   const nftId = methods.watch('nftId');
   const launcherId = launcherIdFromNFTId(nftId ?? '');
-  const { data: nft } = useGetNFTInfoQuery({ coinId: launcherId });
+  const { nft } = useNFT(launcherId);
   const { data: walletBalance, isLoading: isLoadingWalletBalance } = useGetWalletBalanceQuery(
     {
       walletId: tokenWalletInfo.walletId,
@@ -538,16 +533,15 @@ function buildOfferRequest(params: NFTBuildOfferRequestParams) {
 
 export default function NFTOfferEditor(props: NFTOfferEditorProps) {
   const { nft, onOfferCreated, exchangeType } = props;
-  const [createOfferForIds] = useCreateOfferForIdsMutation();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { wallets: nftWallets } = useGetNFTWallets();
-  const { nfts } = useFetchNFTs(nftWallets.map((wallet: Wallet) => wallet.id));
+  const [createOfferForIds, { isLoading: isCreateOfferForIdsLoading }] = useCreateOfferForIdsMutation();
+
+  const { nfts } = useNFTs();
   const currencyCode = useCurrencyCode();
   const openDialog = useOpenDialog();
   const errorDialog = useShowError();
   const navigate = useNavigate();
   const theme = useTheme();
-  const [suppressShareOnCreate] = usePrefs<boolean>(OfferLocalStorageKeys.SUPPRESS_SHARE_ON_CREATE);
+  const [suppressShareOnCreate] = useSuppressShareOnCreate();
   const defaultValues: NFTOfferEditorFormData = {
     exchangeType,
     nftId: nft?.$nftId ?? '',
@@ -567,7 +561,7 @@ export default function NFTOfferEditor(props: NFTOfferEditorProps) {
   });
   const nftId = methods.watch('nftId');
   const launcherId = launcherIdFromNFTId(nftId ?? '');
-  const { data: queriedNFTInfo } = useGetNFTInfoQuery({ coinId: launcherId });
+  const { nft: queriedNFTInfo } = useNFT(launcherId);
 
   function validateFormData(unvalidatedFormData: NFTOfferEditorFormData): NFTOfferEditorValidatedFormData | undefined {
     const {
@@ -664,33 +658,24 @@ export default function NFTOfferEditor(props: NFTOfferEditorProps) {
       return;
     }
 
-    setIsProcessing(true);
-
     try {
       const response = await createOfferForIds({
-        walletIdsAndAmounts: offer,
-        feeInBytes,
+        offer,
+        fee: feeInBytes,
         driverDict,
         validateOnly: false,
         disableJSONFormatting: true,
       }).unwrap();
 
-      if (response.success === false) {
-        const error = response.error || new Error('Encountered an unknown error while creating offer');
-        errorDialog(error);
-      } else {
-        const { offer: offerData, tradeRecord: offerRecord } = response;
+      const { offer: offerData, tradeRecord: offerRecord } = response;
 
-        navigate(-1);
+      navigate(-1);
 
-        if (!suppressShareOnCreate) {
-          onOfferCreated({ offerRecord, offerData });
-        }
+      if (!suppressShareOnCreate) {
+        onOfferCreated({ offerRecord, offerData });
       }
     } catch (err) {
       errorDialog(err);
-    } finally {
-      setIsProcessing(false);
     }
   }
 
@@ -710,7 +695,7 @@ export default function NFTOfferEditor(props: NFTOfferEditorProps) {
         }}
       >
         <Flex flexDirection="row">
-          <NFTOfferConditionalsPanel defaultValues={defaultValues} isProcessing={isProcessing} />
+          <NFTOfferConditionalsPanel defaultValues={defaultValues} isProcessing={isCreateOfferForIdsLoading} />
           <NFTOfferPreview nftId={nftId} />
         </Flex>
       </Flex>

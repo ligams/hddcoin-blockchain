@@ -25,7 +25,7 @@ network_overrides: &network_overrides
     mainnet:
       address_prefix: "hdd"
       default_full_node_port: 28444
-    testnet0:
+    testnet:
       address_prefix: "thdd"
       default_full_node_port: 38444
 
@@ -43,23 +43,21 @@ hddcoin_ssl_ca:
   crt: "config/ssl/ca/hddcoin_ca.crt"
   key: "config/ssl/ca/hddcoin_ca.key"
 
-
 daemon_ssl:
   private_crt: "config/ssl/daemon/private_daemon.crt"
   private_key: "config/ssl/daemon/private_daemon.key"
 
-
 # Controls logging of all servers (harvester, farmer, etc..). Each one can be overridden.
 logging: &logging
-  log_stdout: False  # If True, outputs to stdout instead of a file
+  log_stdout: False # If True, outputs to stdout instead of a file
   log_filename: "log/debug.log"
-  log_level: "INFO"  # Can be CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+  log_level: "INFO" # Can be CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
   log_maxfilesrotation: 7 #  Max files in rotation. Default value 7 if the key is not set
   log_maxbytesrotation: 52428800 #  Max bytes logged before rotating logs
   log_use_gzip: False #  Use gzip to compress rotated logs
-  log_syslog: False  # If True, outputs to SysLog host and port specified
-  log_syslog_host: "localhost"  # Send logging messages to a remote or local Unix syslog
-  log_syslog_port: 514  # UDP port of the remote or local Unix syslog
+  log_syslog: False # If True, outputs to SysLog host and port specified
+  log_syslog_host: "localhost" # Send logging messages to a remote or local Unix syslog
+  log_syslog_port: 514 # UDP port of the remote or local Unix syslog
 
 seeder:
   # The fake full node used for crawling will run on this port.
@@ -115,7 +113,6 @@ harvester:
     batch_size: 300 # How many plot files the harvester processes before it waits batch_sleep_milliseconds
     batch_sleep_milliseconds: 1 # Milliseconds the harvester sleeps between batch processing
 
-
   # If True use parallel reads in chiapos
   parallel_read: True
 
@@ -128,8 +125,8 @@ harvester:
   recursive_plot_scan: False # If True the harvester scans plots recursively in the provided directories.
 
   ssl:
-    private_crt:  "config/ssl/harvester/private_harvester.crt"
-    private_key:  "config/ssl/harvester/private_harvester.key"
+    private_crt: "config/ssl/harvester/private_harvester.crt"
+    private_key: "config/ssl/harvester/private_harvester.key"
 
   private_ssl_ca:
     crt: "config/ssl/ca/private_ca.crt"
@@ -145,7 +142,6 @@ pool:
   logging: *logging
   network_overrides: *network_overrides
   selected_network: *selected_network
-
 
 farmer:
   # The farmer server (if run) will run on this port
@@ -174,10 +170,10 @@ farmer:
   selected_network: *selected_network
 
   ssl:
-    private_crt:  "config/ssl/farmer/private_farmer.crt"
-    private_key:  "config/ssl/farmer/private_farmer.key"
-    public_crt:  "config/ssl/farmer/public_farmer.crt"
-    public_key:  "config/ssl/farmer/public_farmer.key"
+    private_crt: "config/ssl/farmer/private_farmer.crt"
+    private_key: "config/ssl/farmer/private_farmer.key"
+    public_crt: "config/ssl/farmer/public_farmer.crt"
+    public_key: "config/ssl/farmer/public_farmer.key"
 
 # Don't run this unless you want to run VDF clients on the local machine.
 timelord_launcher:
@@ -187,7 +183,6 @@ timelord_launcher:
   # Number of VDF client processes to keep alive in the local machine.
   process_count: 3
   logging: *logging
-
 
 timelord:
   # The timelord server (if run) will run on this port
@@ -202,8 +197,8 @@ timelord:
     ips_estimate:
       - 150000
   full_node_peer:
-      host: *self_hostname
-      port: 28444
+    host: *self_hostname
+    port: 28444
   # Maximum number of seconds allowed for a client to reconnect to the server.
   max_connection_time: 60
   # The ip and port where the TCP clients will connect.
@@ -242,10 +237,10 @@ timelord:
   rpc_port: 28557
 
   ssl:
-    private_crt:  "config/ssl/timelord/private_timelord.crt"
-    private_key:  "config/ssl/timelord/private_timelord.key"
-    public_crt:  "config/ssl/timelord/public_timelord.crt"
-    public_key:  "config/ssl/timelord/public_timelord.key"
+    private_crt: "config/ssl/timelord/private_timelord.crt"
+    private_key: "config/ssl/timelord/private_timelord.key"
+    public_crt: "config/ssl/timelord/public_timelord.crt"
+    public_key: "config/ssl/timelord/public_timelord.key"
 
 full_node:
   # The full node server (if run) will run on this port
@@ -353,17 +348,17 @@ full_node:
 
   # List of trusted DNS seeders to bootstrap from.
   # If you modify this, please change the hardcode as well from FullNode.set_server()
-  dns_servers:
+  dns_servers: &dns_servers
     - "dns-introducer.hddcoin.org"
   farmer_peer:
-      host: *self_hostname
-      port: 28447
+    host: *self_hostname
+    port: 28447
   timelord_peer:
-      host: *self_hostname
-      port: 28446
+    host: *self_hostname
+    port: 28446
   introducer_peer:
-      host: introducer.hddcoin.org  # HDDcoin AWS introducer IPv4/IPv6
-      port: 28444
+    host: introducer.hddcoin.org # HDDcoin AWS introducer IPv4/IPv6
+    port: 28444
   wallet_peer:
     host: *self_hostname
     port: 28449
@@ -376,14 +371,14 @@ full_node:
     0ThisisanexampleNodeID7ff9d60f1c3fa270c213c0ad0cb89c01274634a7c3cb7: Does_not_matter
 
   ssl:
-    private_crt:  "config/ssl/full_node/private_full_node.crt"
-    private_key:  "config/ssl/full_node/private_full_node.key"
-    public_crt:  "config/ssl/full_node/public_full_node.crt"
-    public_key:  "config/ssl/full_node/public_full_node.key"
+    private_crt: "config/ssl/full_node/private_full_node.crt"
+    private_key: "config/ssl/full_node/private_full_node.key"
+    public_crt: "config/ssl/full_node/public_full_node.crt"
+    public_key: "config/ssl/full_node/public_full_node.key"
   use_hddcoin_loop_policy: True
 
 ui:
-   # The ui node server (if run) will run on this port
+  # The ui node server (if run) will run on this port
   port: 28222
 
   # Which port to use to communicate with the full node
@@ -415,8 +410,8 @@ introducer:
   selected_network: *selected_network
 
   ssl:
-    public_crt:  "config/ssl/full_node/public_full_node.crt"
-    public_key:  "config/ssl/full_node/public_full_node.key"
+    public_crt: "config/ssl/full_node/public_full_node.crt"
+    public_key: "config/ssl/full_node/public_full_node.key"
 
 wallet:
   port: 28449
@@ -437,9 +432,11 @@ wallet:
   connect_to_unknown_peers: True
 
   initial_num_public_keys: 425
+  reuse_public_key_for_change:
+    #Add your wallet fingerprint here, this is an example.
+    "2999502625": False
 
-  dns_servers:
-    - "dns-introducer.hddcoin.org"
+  dns_servers: *dns_servers
 
   full_node_peer:
     host: *self_hostname
@@ -476,10 +473,10 @@ wallet:
     port: 28444
 
   ssl:
-    private_crt:  "config/ssl/wallet/private_wallet.crt"
-    private_key:  "config/ssl/wallet/private_wallet.key"
-    public_crt:  "config/ssl/wallet/public_wallet.crt"
-    public_key:  "config/ssl/wallet/public_wallet.key"
+    private_crt: "config/ssl/wallet/private_wallet.crt"
+    private_key: "config/ssl/wallet/private_wallet.key"
+    public_crt: "config/ssl/wallet/public_wallet.crt"
+    public_key: "config/ssl/wallet/public_wallet.key"
 
   # Node IDs of trusted full node peers, for performing a fast trusted wallet sync
   trusted_peers:
@@ -495,11 +492,14 @@ wallet:
   weight_proof_timeout: *weight_proof_timeout
 
   # if an unknown CAT belonging to us is seen, a wallet will be automatically created
-  # the user accepts the risk/responsibility of verifying the authenticity and origin of unknown CATs
+  # the user accepts the risk/responsibility of verifying the authenticity and origin of unknown HATs
   automatically_add_unknown_cats: False
 
   # Interval to resend unconfirmed transactions, even if previously accepted into Mempool
   tx_resend_timeout_secs: 1800
+
+  # Reset wallet sync data on start for given fingerprint
+  reset_sync_for_fingerprint: null
 
   # After n received unspent transactions, the spam filter will be enabled, which will filter out received
   # coins with very small value. Any standard TX under hdd_spam_amount is filtered
@@ -509,6 +509,24 @@ wallet:
   enable_notifications: True
   # The amount someone has to pay you in bytes for you to see their notification
   required_notification_amount: 10000000
+
+  #################################
+  #  Inner puzzle decorators      #
+  #################################
+  # Default puzzle decorator settings, this will apply to all asset wallets under the same key
+  # Here is an example
+  # puzzle_decorators:
+  #   2999502625:
+  #     - decorator: "CLAWBACK"
+  #       clawback_timelock: 3600
+  #     - decorator: "DECORATOR_TYPE" #If you want to add more decorators
+  #       parameter1: 0
+
+  auto_claim:
+    enabled: False
+    tx_fee: 0
+    min_amount: 0
+    batch_size: 50
 
 data_layer:
   # TODO: consider name
@@ -545,13 +563,14 @@ data_layer:
   # TODO: which of these are really appropriate?
 
   ssl:
-    private_crt:  "config/ssl/data_layer/private_data_layer.crt"
-    private_key:  "config/ssl/data_layer/private_data_layer.key"
-    public_crt:  "config/ssl/data_layer/public_data_layer.crt"
-    public_key:  "config/ssl/data_layer/public_data_layer.key"
+    private_crt: "config/ssl/data_layer/private_data_layer.crt"
+    private_key: "config/ssl/data_layer/private_data_layer.key"
+    public_crt: "config/ssl/data_layer/public_data_layer.crt"
+    public_key: "config/ssl/data_layer/public_data_layer.key"
 
+  uploaders: []
+  downloaders: []
 simulator:
-
   # Should the simulator farm a block whenever a transaction is in mempool
   auto_farm: True
 

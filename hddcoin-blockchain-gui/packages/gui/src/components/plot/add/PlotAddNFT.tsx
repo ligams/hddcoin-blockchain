@@ -1,4 +1,4 @@
-import { Button, CardStep, Select, Flex, Loading, Link } from '@hddcoin-network/core';
+import { Button, CardStep, Select, Flex, Link, Loading } from '@hddcoin-network/core';
 import { Trans } from '@lingui/macro';
 import { Box, Grid, FormControl, InputLabel, MenuItem, Typography } from '@mui/material';
 import React, { useState, forwardRef } from 'react';
@@ -56,10 +56,10 @@ const PlotAddNFT = forwardRef((props: Props, ref) => {
       title={
         <Flex gap={1} alignItems="baseline">
           <Box>
-            <Trans>Join a Pool</Trans>
+            <Trans>Plot to a Plot NFT</Trans>
           </Box>
           <Typography variant="body1" color="textSecondary">
-            <Trans>(Optional)</Trans>
+            <Trans>(Recommended)</Trans>
           </Typography>
         </Flex>
       }
@@ -69,7 +69,15 @@ const PlotAddNFT = forwardRef((props: Props, ref) => {
       {!loading && hasNFTs && (
         <>
           <Typography variant="subtitle1">
-            <Trans>Select your Plot NFT from the dropdown or create a new one.</Trans>
+            <Trans>
+              Plotting to a Plot NFT allows you the flexibility to join a pool or solo farm. You can easily switch
+              between different pools or solo farming at any time. If you choose not to plot to a Plot NFT, you will
+              need to replot in order to join any of the standard pools.
+            </Trans>
+            &nbsp;
+            <Link target="_blank" href="https://hddcoin.org/pooling">
+              <Trans>Learn more</Trans>
+            </Link>
           </Typography>
 
           <Grid spacing={2} direction="column" container>

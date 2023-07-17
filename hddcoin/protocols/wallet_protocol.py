@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from chia_rs import CoinState, RespondToPhUpdates
+import chia_rs
 
 from hddcoin.full_node.fee_estimate import FeeEstimateGroup
 from hddcoin.types.blockchain_format.coin import Coin
-from hddcoin.types.blockchain_format.program import SerializedProgram
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.header_block import HeaderBlock
 from hddcoin.types.spend_bundle import SpendBundle
@@ -20,7 +20,8 @@ Note: When changing this file, also change protocol_message_types.py, and the pr
 """
 
 
-__all__ = ["CoinState", "RespondToPhUpdates"]
+CoinState = chia_rs.CoinState
+RespondToPhUpdates = chia_rs.RespondToPhUpdates
 
 
 @streamable

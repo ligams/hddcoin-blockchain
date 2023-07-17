@@ -13,12 +13,13 @@ export type OfferBuilderNFTSectionProps = {
   muted?: boolean;
   viewer?: boolean;
   isMyOffer?: boolean;
+  max?: number;
 };
 
 export default function OfferBuilderNFTSection(props: OfferBuilderNFTSectionProps) {
-  const { name, offering, muted, viewer, isMyOffer = false } = props;
+  const { name, offering, muted, viewer, isMyOffer = false, max = 10 } = props;
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     name,
   });
 
@@ -28,10 +29,6 @@ export default function OfferBuilderNFTSection(props: OfferBuilderNFTSectionProp
     });
   }
 
-  function onSelectNFT(index, nftId) {
-    update(index, { nftId });
-  }
-
   function handleRemove(index: number) {
     remove(index);
   }
@@ -39,12 +36,14 @@ export default function OfferBuilderNFTSection(props: OfferBuilderNFTSectionProp
   const showProvenance = viewer ? (isMyOffer ? offering : !offering) : !offering;
   const showRoyalties = viewer ? (isMyOffer ? !offering : offering) : offering;
 
+  const canAdd = !!fields && (!max || fields.length < max);
+
   return (
     <OfferBuilderSection
       icon={<NFTs />}
       title={<Trans>NFT</Trans>}
       subtitle={<Trans>One-of-a-kind Collectible assets</Trans>}
-      onAdd={handleAdd}
+      onAdd={canAdd ? handleAdd : undefined}
       expanded={!!fields.length}
       muted={muted}
     >
@@ -56,7 +55,6 @@ export default function OfferBuilderNFTSection(props: OfferBuilderNFTSectionProp
             provenance={showProvenance}
             showRoyalties={showRoyalties}
             onRemove={() => handleRemove(index)}
-            onSelectNFT={(nftId: string) => onSelectNFT(index, nftId)}
           />
         ))}
       </Flex>

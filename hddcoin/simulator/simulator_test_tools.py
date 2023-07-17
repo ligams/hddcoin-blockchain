@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, Optional, Tuple
@@ -136,7 +135,6 @@ async def get_full_hddcoin_simulator(
         keychain = Keychain()
 
     with Lockfile.create(daemon_launch_lock_path(hddcoin_root)):
-
         mnemonic, fingerprint = mnemonic_fingerprint(keychain)
 
         ssl_ca_cert_and_key_wrapper: SSLTestCollateralWrapper[
@@ -158,13 +156,8 @@ async def get_full_hddcoin_simulator(
         ca_crt_path = hddcoin_root / config["private_ssl_ca"]["crt"]
         ca_key_path = hddcoin_root / config["private_ssl_ca"]["key"]
 
-        shutdown_event = asyncio.Event()
-        ws_server = WebSocketServer(hddcoin_root, ca_crt_path, ca_key_path, crt_path, key_path, shutdown_event)
+        ws_server = WebSocketServer(hddcoin_root, ca_crt_path, ca_key_path, crt_path, key_path)
         await ws_server.setup_process_global_state()
-        await ws_server.start()
-
-        async for simulator in start_simulator(hddcoin_root, automated_testing):
-            yield simulator, hddcoin_root, config, mnemonic, fingerprint, keychain
-
-        await ws_server.stop()
-        await shutdown_event.wait()  # wait till shutdown is complete
+        async with ws_server.run():
+            async for simulator in start_simulator(hddcoin_root, automated_testing):
+                yield simulator, hddcoin_root, config, mnemonic, fingerprint, keychain

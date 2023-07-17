@@ -27,7 +27,7 @@ export default function OfferBuilderNFTProvenance(props: OfferBuilderNFTProvenan
           </Trans>
         </TooltipIcon>
       </Flex>
-	  {/*
+	 {/*	 
       <Button
         variant="outlined"
         color="primary"
@@ -48,7 +48,7 @@ export default function OfferBuilderNFTProvenance(props: OfferBuilderNFTProvenan
           <Trans>Check Provenance on Spacescan.io</Trans>
         </Typography>
       </Button>
-	  */}
+	 */}	 
     </Flex>
   );
 }

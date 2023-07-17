@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import io
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Set, Tuple, List, Optional
 
-from chia_rs import MEMPOOL_MODE, run_chia_program, run_generator, serialized_length, tree_hash
+from chia_rs import run_chia_program, tree_hash, MEMPOOL_MODE, run_generator, serialized_length
 from clvm import SExp
 from clvm.casts import int_from_bytes
 from clvm.EvalError import EvalError
 from clvm.serialize import sexp_from_stream, sexp_to_stream
 
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.types.spend_bundle_conditions import SpendBundleConditions
 from hddcoin.util.byte_types import hexstr_to_bytes
 from hddcoin.util.hash import std_hash
 
 from .tree_hash import sha256_treehash
 
-INFINITE_COST = 0x7FFFFFFFFFFFFFFF
+INFINITE_COST = 11000000000
 
 
 class Program(SExp):

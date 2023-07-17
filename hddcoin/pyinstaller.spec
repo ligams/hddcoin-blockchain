@@ -65,13 +65,16 @@ SERVERS = [
     "timelord",
 ]
 
-# TODO: collapse all these entry points into one `hddcoin_exec` entrypoint that accepts the server as a parameter
+if THIS_IS_WINDOWS:
+    hidden_imports_for_windows = ["win32timezone", "win32cred", "pywintypes", "win32ctypes.pywin32"]
+else:
+    hidden_imports_for_windows = []
 
-entry_points = ["hddcoin.cmds.hddcoin"] + [f"hddcoin.server.start_{s}" for s in SERVERS]
-
-hiddenimports = []
-hiddenimports.extend(entry_points)
-hiddenimports.extend(keyring_imports)
+hiddenimports = [
+    *collect_submodules("hddcoin"),
+    *keyring_imports,
+    *hidden_imports_for_windows,
+]
 
 binaries = []
 
@@ -98,13 +101,6 @@ if os.path.exists(f"{ROOT}/bladebit/bladebit"):
             "bladebit"
         )
     ])
-
-if THIS_IS_WINDOWS:
-    hiddenimports.extend(["win32timezone", "win32cred", "pywintypes", "win32ctypes.pywin32"])
-
-# this probably isn't necessary
-if THIS_IS_WINDOWS:
-    entry_points.extend(["aiohttp", "hddcoin.util.bip39"])
 
 if THIS_IS_WINDOWS:
     hddcoin_mod = importlib.import_module("hddcoin")
@@ -142,7 +138,8 @@ datas = []
 
 datas.append((f"{ROOT}/hddcoin/util/english.txt", "hddcoin/util"))
 datas.append((f"{ROOT}/hddcoin/util/initial-config.yaml", "hddcoin/util"))
-datas.append((f"{ROOT}/hddcoin/wallet/puzzles/*.hex", "hddcoin/wallet/puzzles"))
+for path in sorted({path.parent for path in ROOT.joinpath("hddcoin").rglob("*.hex")}):
+    datas.append((f"{path}/*.hex", path.relative_to(ROOT)))
 datas.append((f"{ROOT}/hddcoin/ssl/*", "hddcoin/ssl"))
 datas.append((f"{ROOT}/mozilla-ca/*", "mozilla-ca"))
 datas.append(version_data)
@@ -202,6 +199,8 @@ for server in SERVERS:
 add_binary("start_crawler", f"{ROOT}/hddcoin/seeder/start_crawler.py", COLLECT_ARGS)
 add_binary("start_seeder", f"{ROOT}/hddcoin/seeder/dns_server.py", COLLECT_ARGS)
 add_binary("start_data_layer_http", f"{ROOT}/hddcoin/data_layer/data_layer_server.py", COLLECT_ARGS)
+add_binary("start_data_layer_s3_plugin", f"{ROOT}/hddcoin/data_layer/s3_plugin_service.py", COLLECT_ARGS)
+add_binary("timelord_launcher", f"{ROOT}/hddcoin/timelord/timelord_launcher.py", COLLECT_ARGS)
 
 COLLECT_KWARGS = dict(
     strip=False,

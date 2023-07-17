@@ -53,7 +53,7 @@ export default function OfferBuilderImport() {
       throw new Error(t`Could not parse offer data`);
     }
 
-    const { summary } = await getOfferSummary(offerData).unwrap();
+    const { summary } = await getOfferSummary({ offerData }).unwrap();
 
     if (summary) {
       navigate('/dashboard/offers/view', {
@@ -92,6 +92,7 @@ export default function OfferBuilderImport() {
     fs.stat(offerFilePath, (err, stats) => {
       if (err) {
         showError(err);
+        setIsParsing(false);
       } else {
         continueOpen(stats);
       }

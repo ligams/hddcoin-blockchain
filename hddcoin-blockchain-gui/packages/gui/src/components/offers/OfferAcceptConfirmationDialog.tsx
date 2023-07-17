@@ -37,7 +37,7 @@ export default function OfferAcceptConfirmationDialog(props: OfferAcceptConfirma
                   below match the asset IDs of the tokens you expect to receive.
                 </Trans>
               </Typography>
-              <Typography variant="subtitle1">Unknown CATs:</Typography>
+              <Typography variant="subtitle1">Unknown HATs:</Typography>
               <StyledSummaryBox>
                 <Flex flexDirection="column">
                   {offeredUnknownCATs.map((assetId) => (

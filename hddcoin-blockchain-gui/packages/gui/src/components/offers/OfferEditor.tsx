@@ -1,5 +1,5 @@
 import { WalletType } from '@hddcoin-network/api';
-import { useCreateOfferForIdsMutation, usePrefs } from '@hddcoin-network/api-react';
+import { useCreateOfferForIdsMutation } from '@hddcoin-network/api-react';
 import {
   Back,
   Button,
@@ -19,10 +19,10 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 
+import useSuppressShareOnCreate from '../../hooks/useSuppressShareOnCreate';
 import OfferEditorConditionsPanel from './OfferEditorConditionsPanel';
 import OfferEditorConfirmationDialog from './OfferEditorConfirmationDialog';
 import type OfferEditorRowData from './OfferEditorRowData';
-import OfferLocalStorageKeys from './OfferLocalStorage';
 
 /* ========================================================================== */
 /*                                Offer Editor                                */
@@ -71,7 +71,7 @@ function OfferEditor(props: OfferEditorProps) {
   });
   const openDialog = useOpenDialog();
   const errorDialog = useShowError();
-  const [suppressShareOnCreate] = usePrefs<boolean>(OfferLocalStorageKeys.SUPPRESS_SHARE_ON_CREATE);
+  const [suppressShareOnCreate] = useSuppressShareOnCreate();
   const [createOfferForIds] = useCreateOfferForIdsMutation();
   const [processing, setIsProcessing] = useState<boolean>(false);
 
@@ -121,25 +121,22 @@ function OfferEditor(props: OfferEditorProps) {
 
     try {
       const response = await createOfferForIds({
-        walletIdsAndAmounts: offer,
-        feeInBytes,
+        offer,
+        fee: feeInBytes,
+        driverDict: {},
         validateOnly: false,
       }).unwrap();
-      if (response.success === false) {
-        const error = response.error || new Error('Encountered an unknown error while creating offer');
-        errorDialog(error);
-      } else {
-        const { offer: offerData, tradeRecord: offerRecord } = response;
 
-        try {
-          navigate(-1);
+      const { offer: offerData, tradeRecord: offerRecord } = response;
 
-          if (!suppressShareOnCreate) {
-            onOfferCreated({ offerRecord, offerData });
-          }
-        } catch (err) {
-          console.error(err);
+      try {
+        navigate(-1);
+
+        if (!suppressShareOnCreate) {
+          onOfferCreated({ offerRecord, offerData });
         }
+      } catch (err) {
+        console.error(err);
       }
     } catch (e) {
       let error = e as Error;

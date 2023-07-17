@@ -172,11 +172,11 @@ export default function WalletTokenCard(props: WalletTokenCardProps) {
                   </Typography>
                 </Tooltip>
               )}
-              {/* {assetId && (
+              {/* assetId && (
                 <Link href={`https://www.taildatabase.com/tail/${assetId}`} target="_blank" variant="caption">
                   <Trans>Search on Tail Database</Trans>
-                </Link> 
-              )} */}
+                </Link>
+              ) */ }
             </Flex>
           )}
         </Flex>

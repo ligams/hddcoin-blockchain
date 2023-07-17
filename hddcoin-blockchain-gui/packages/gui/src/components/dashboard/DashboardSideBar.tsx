@@ -1,3 +1,4 @@
+import { useLocalStorage } from '@hddcoin-network/api-react';
 import { Flex, SideBarItem } from '@hddcoin-network/core';
 import {
   Farming as FarmingIcon,
@@ -9,6 +10,7 @@ import {
   Tokens as TokensIcon,
   HDDapps as HDDappsIcon,
   Settings as SettingsIcon,
+  VC as VCIcon,
 } from '@hddcoin-network/icons';
 import { Trans } from '@lingui/macro';
 import { Box } from '@mui/material';
@@ -42,6 +44,7 @@ export type DashboardSideBarProps = {
 
 export default function DashboardSideBar(props: DashboardSideBarProps) {
   const { simple = false } = props;
+  const [enableVerifiableCredentials] = useLocalStorage<boolean>('enable-verifiable-credentials', true);
 
   return (
     <StyledRoot>
@@ -58,6 +61,16 @@ export default function DashboardSideBar(props: DashboardSideBarProps) {
           title={<Trans>NFTs</Trans>}
           data-testid="DashboardSideBar-nfts"
         />
+		{/*
+        {enableVerifiableCredentials && (
+          <SideBarItem
+            to="/dashboard/vc"
+            icon={VCIcon}
+            title={<Trans>Credentials</Trans>}
+            data-testid="DashboardSideBar-vc"
+          />
+        )}
+		*/}
         <SideBarItem
           to="/dashboard/offers"
           icon={OffersIcon}
@@ -98,7 +111,7 @@ export default function DashboardSideBar(props: DashboardSideBarProps) {
               title={<Trans>Farming</Trans>}
               data-testid="DashboardSideBar-farming"
             />
-			{/* 
+			{/*
             <SideBarItem
               to="/dashboard/pool"
               icon={PoolingIcon}
@@ -108,7 +121,7 @@ export default function DashboardSideBar(props: DashboardSideBarProps) {
 			*/}
           </>
         )}
-        <SideBarItem
+		<SideBarItem
 		  to="/dashboard/hddapps"
 		  icon={HDDappsIcon}
 		  title={<Trans>HDD Apps</Trans>}

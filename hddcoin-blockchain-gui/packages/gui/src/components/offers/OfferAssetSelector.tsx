@@ -141,7 +141,7 @@ function OfferAssetSelector(props: OfferAssetSelectorProps) {
       <Select name={name} id={id} defaultValue={defaultValue || ''}>
         {showAddWalletMessage === true && (
           <MenuItem disabled value={-1} key={-1} onClick={() => {}}>
-            <Trans>Add CAT wallets to have more options</Trans>
+            <Trans>Add HAT wallets to have more options</Trans>
           </MenuItem>
         )}
         {options.map((option) => (

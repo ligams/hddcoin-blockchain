@@ -12,13 +12,15 @@
     "check": "npm run check:lint ; npm run check:prettier ; npm run check:types",
     "check:lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "check:prettier": "prettier --check --ignore-path .gitignore .",
-    "check:types": "lerna exec --scope @hddcoin-network/icons -- npm run check:types",
+    "check:types": "lerna exec --scope '{@hddcoin-network/api,@hddcoin-network/api-react,@hddcoin-network/icons}' -- npm run check:types",
     "check:typesEverywhere": "lerna exec -- npm run check:types",
     "autofix": "npm run autofix:lint ; npm run autofix:prettier",
     "autofix:lint": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "autofix:prettier": "prettier --write --ignore-path .gitignore .",
     "build": "lerna run build",
-    "build:watch": "lerna run build:watch",
+    "build:skipLocales": "lerna run build:js",
+    "build:ci": "lerna run build:ci",
+    "build:watch": "lerna run build:watch --parallel",
     "start:gui": "lerna run start --scope @hddcoin-network/gui",
     "dev:gui": "lerna run dev --scope @hddcoin-network/gui --stream",
     "electron": "npm run start:gui",
@@ -27,8 +29,15 @@
     "locale": "lerna run locale",
     "audit": "lerna exec -- npm audit",
     "audit:fix": "lerna exec -- npm audit fix",
-    "test": "lerna run test --stream -- -- --passWithNoTests --coverage",
-    "restoreMessages": "./restoreMessages.sh"
+    "test": "lerna run test --stream -- -- --passWithNoTests --coverage --coverageDirectory=.coverage && npm run coverage:merge && npm run coverage:report",
+    "coverage:merge": "npx istanbul-merge --out .nyc_output/coverage.json packages/api/.coverage/coverage-final.json packages/api-react/.coverage/coverage-final.json packages/core/.coverage/coverage-final.json packages/gui/.coverage/coverage-final.json  packages/icons/.coverage/coverage-final.json packages/wallets/.coverage/coverage-final.json",
+    "coverage:report": "npx nyc report --reporter=text --reporter=lcov",
+    "restoreMessages": "node restoreMessages.js",
+    "prepare": "cd .. && husky install front/.husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": "eslint",
+    "*": "prettier --check --ignore-unknown --ignore-path .gitignore"
   },
   "dependencies": {
     "lerna": "^5.1.8"
@@ -46,7 +55,12 @@
     "eslint-plugin-react": "7.31.11",
     "eslint-plugin-react-hooks": "4.6.0",
     "eslint-plugin-unicorn": "45.0.2",
+    "date-and-time": "2.4.3",
+    "husky": "8.0.0",
+    "istanbul-merge": "2.0.0",
     "lerna-audit": "^1.3.3",
+    "lint-staged": "13.1.2",
+    "nyc": "15.1.0",
     "prettier": "2.8.1",
     "typescript": "^4.9.4"
   },

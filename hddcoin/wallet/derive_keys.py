@@ -11,7 +11,7 @@ from hddcoin.util.ints import uint32
 # EIP 2334 bls key derivation
 # https://eips.ethereum.org/EIPS/eip-2334
 # 12381 = bls spec number
-# 8444 = HDDcoin blockchain number and port number
+# 28444 = HDDcoin blockchain number and port number
 # 0, 1, 2, 3, 4, 5, 6 farmer, pool, wallet, local, backup key, singleton, pooling authentication key numbers
 
 # Allows up to 100 pool wallets (plot NFTs)
@@ -115,7 +115,6 @@ def match_address_to_sk(
     search_list: Set[bytes32] = set(addresses_to_search)
 
     for i in range(max_ph_to_search):
-
         phs = [
             create_puzzlehash_for_pk(master_sk_to_wallet_sk(sk, uint32(i)).get_g1()),
             create_puzzlehash_for_pk(master_sk_to_wallet_sk_unhardened(sk, uint32(i)).get_g1()),

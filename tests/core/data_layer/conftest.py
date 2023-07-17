@@ -15,7 +15,7 @@ from _pytest.fixtures import SubRequest
 
 from hddcoin.data_layer.data_layer_util import NodeType, Status
 from hddcoin.data_layer.data_store import DataStore
-from hddcoin.types.blockchain_format.tree_hash import bytes32
+from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from tests.core.data_layer.util import (
     HDDcoinRoot,
     Example,

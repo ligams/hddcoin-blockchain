@@ -14,6 +14,7 @@ import Pool from '../pool/Pool';
 import HDDapps from '../hddapps/HDDapps';
 import Settings from '../settings/Settings';
 import SettingsPanel from '../settings/SettingsPanel';
+import VCs from '../vcs/VCs';
 import AppProviders from './AppProviders';
 import AppStatusHeader from './AppStatusHeader';
 
@@ -46,7 +47,8 @@ export default function AppRouter() {
               <Route path="dashboard/wallets/*" element={<Wallets />} />
               <Route path="dashboard/offers/*" element={<CreateOffer />} />
               <Route path="dashboard/nfts/*" element={<NFTs />} />
-              <Route path="dashboard/hddapps/*" element={<HDDapps />} />
+			  <Route path="dashboard/hddapps/*" element={<HDDapps />} />
+              <Route path="dashboard/vc/*" element={<VCs />} />
               <Route path="dashboard/*" element={<Navigate to="wallets" />} />
               <Route path="dashboard/settings/*" element={<Settings />} />
             </Route>
@@ -66,11 +68,12 @@ export default function AppRouter() {
               <Route path="dashboard/wallets/*" element={<Wallets />} />
               <Route path="dashboard/offers/*" element={<CreateOffer />} />
               <Route path="dashboard/nfts/*" element={<NFTs />} />
+              <Route path="dashboard/vc/*" element={<VCs />} />
               <Route path="dashboard/settings/*" element={<Settings />} />
               <Route path="dashboard/plot/*" element={<Plot />} />
               <Route path="dashboard/farm/*" element={<Farm />} />
               <Route path="dashboard/pool/*" element={<Pool />} />
-              <Route path="dashboard/hddapps/*" element={<HDDapps />} />
+			  <Route path="dashboard/hddapps/*" element={<HDDapps />} />
             </Route>
           )}
         </Route>

@@ -9,6 +9,7 @@ import Connections from '../fullNode/FullNodeConnections';
 import FullNodeStateIndicator from '../fullNode/FullNodeStateIndicator';
 import NotificationsDropdown from '../notification/NotificationsDropdown';
 import WalletConnectDropdown from '../walletConnect/WalletConnectDropdown';
+import AppTestnetIndicator from './AppTestnetIndicator';
 
 const StyledPopover = styled((props: PopoverProps) => <Popover {...props} />)(({ theme }) => ({
   '& .MuiPopover-paper': {
@@ -41,12 +42,44 @@ export default function AppStatusHeader() {
   const ButtonStyle = {
     paddingTop: '3px',
     paddingBottom: 0,
+    paddingLeft: '3px',
     borderRadius: 2,
     border: `1px solid ${borderColor}`,
     '&:hover': {
       border: `1px solid ${borderColor}`,
     },
     whiteSpace: 'nowrap',
+    '.cancel-icon': {
+      g: {
+        circle: {
+          stroke: '#D32F2F',
+          fill: '#D32F2F',
+        },
+      },
+    },
+    '.checkmark-icon': {
+      g: {
+        circle: {
+          stroke: theme.palette.primary.main,
+          fill: theme.palette.primary.main,
+        },
+        path: {
+          stroke: theme.palette.primary.main,
+          fill: theme.palette.primary.main,
+        },
+      },
+    },
+    '.reload-icon': {
+      g: {
+        circle: {
+          stroke: '#FF9800',
+          fill: '#FF9800',
+        },
+        path: {
+          fill: '#FF9800',
+        },
+      },
+    },
   };
 
   const [mode] = useMode();
@@ -71,9 +104,9 @@ export default function AppStatusHeader() {
   };
 
   return (
-    <Flex gap={1}>
+    <Flex gap={2}>
+      <AppTestnetIndicator />
       <WalletReceiveAddressField variant="outlined" size="small" fullWidth isDarkMode={isDarkMode} />
-      <WalletConnectDropdown />
       <ButtonGroup variant="outlined" color="secondary" size="small">
         {mode === Mode.FARMING && (
           <>
@@ -125,8 +158,18 @@ export default function AppStatusHeader() {
             <WalletConnections walletId={1} />
           </Box>
         </StyledPopover>
+        <Flex
+          sx={{
+            marginLeft: '15px',
+            '> div + div': {
+              marginLeft: '15px',
+            },
+          }}
+        >
+          <WalletConnectDropdown />
+          <NotificationsDropdown />
+        </Flex>
       </ButtonGroup>
-      <NotificationsDropdown />
     </Flex>
   );
 }

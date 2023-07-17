@@ -5,12 +5,12 @@ from typing import List, Optional, Set
 
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.foliage import Foliage, FoliageTransactionBlock, TransactionsInfo
-from hddcoin.types.blockchain_format.program import SerializedProgram
 from hddcoin.types.blockchain_format.reward_chain_block import RewardChainBlock
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.blockchain_format.vdf import VDFProof
 from hddcoin.types.end_of_slot_bundle import EndOfSubSlotBundle
-from hddcoin.util.ints import uint32
+from hddcoin.util.ints import uint32, uint128
 from hddcoin.util.streamable import Streamable, streamable
 
 
@@ -42,11 +42,11 @@ class FullBlock(Streamable):
         return self.reward_chain_block.height
 
     @property
-    def weight(self):
+    def weight(self) -> uint128:
         return self.reward_chain_block.weight
 
     @property
-    def total_iters(self):
+    def total_iters(self) -> uint128:
         return self.reward_chain_block.total_iters
 
     @property

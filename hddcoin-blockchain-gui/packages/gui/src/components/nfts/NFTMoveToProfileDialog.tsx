@@ -7,36 +7,25 @@ import {
   ButtonLoading,
   ConfirmDialog,
   CopyToClipboard,
-  DropdownActions,
-  DropdownActionsProps,
   EstimatedFee,
+  FeeTxType,
   Flex,
   Form,
   TooltipIcon,
-  MenuItem,
   hddcoinToByte,
   truncateValue,
   useOpenDialog,
   useShowError,
 } from '@hddcoin-network/core';
 import { Trans, t } from '@lingui/macro';
-import { PermIdentity as PermIdentityIcon } from '@mui/icons-material';
-import {
-  Box,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  ListItemIcon,
-  Typography,
-} from '@mui/material';
-import React, { useMemo, useState } from 'react';
+import { Box, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
+import React, { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import styled from 'styled-components';
 
-import { didFromDIDId, didToDIDId } from '../../util/dids';
-import { stripHexPrefix } from '../../util/utils';
+import { didToDIDId } from '../../util/dids';
+import removeHexPrefix from '../../util/removeHexPrefix';
+import DIDProfileDropdown from '../did/DIDProfileDropdown';
 import NFTSummary from './NFTSummary';
 import { getNFTInbox } from './utils';
 
@@ -79,94 +68,6 @@ function NFTMoveToProfileConfirmationDialog(props: NFTMoveToProfileConfirmationD
 }
 
 /* ========================================================================== */
-/*                            DID Profile Dropdown                            */
-/* ========================================================================== */
-
-type DIDProfileDropdownProps = DropdownActionsProps & {
-  walletId?: number;
-  onChange?: (walletId?: number) => void;
-  defaultTitle?: string | React.ReactElement;
-  currentDID?: string;
-  includeNoneOption?: boolean;
-};
-
-export function DIDProfileDropdown(props: DIDProfileDropdownProps) {
-  const {
-    walletId,
-    onChange,
-    defaultTitle = t`All Profiles`,
-    currentDID = '',
-    includeNoneOption = false,
-    ...rest
-  } = props;
-  const { data: allDIDWallets, isLoading } = useGetDIDsQuery();
-
-  const didWallets = useMemo(() => {
-    if (!allDIDWallets) {
-      return [];
-    }
-
-    const excludeDIDs: string[] = [];
-    if (currentDID) {
-      const did = didFromDIDId(currentDID);
-      if (did) {
-        excludeDIDs.push(did);
-      }
-    }
-
-    return allDIDWallets.filter((wallet: Wallet) => !excludeDIDs.includes(wallet.myDid));
-  }, [allDIDWallets, currentDID]);
-
-  const label = useMemo(() => {
-    if (isLoading) {
-      return t`Loading...`;
-    }
-
-    const wallet = didWallets?.find((walletItem: Wallet) => walletItem.id === walletId);
-
-    return wallet?.name || defaultTitle;
-  }, [defaultTitle, didWallets, isLoading, walletId]);
-
-  function handleWalletChange(newWalletId?: number) {
-    onChange?.(newWalletId);
-  }
-
-  return (
-    <DropdownActions
-      onSelect={handleWalletChange}
-      label={label}
-      variant="text"
-      color="secondary"
-      size="large"
-      {...rest}
-    >
-      {(didWallets ?? []).map((wallet: Wallet, index: number) => (
-        <MenuItem
-          key={wallet.id}
-          onClick={() => handleWalletChange(wallet.id)}
-          selected={wallet.id === walletId}
-          divider={index === didWallets.length - 1 && includeNoneOption}
-          close
-        >
-          <ListItemIcon>
-            <PermIdentityIcon />
-          </ListItemIcon>
-          {wallet.name}
-        </MenuItem>
-      ))}
-      {includeNoneOption && (
-        <MenuItem key="<none>" onClick={() => handleWalletChange()} selected={!walletId && !currentDID} close>
-          <ListItemIcon>
-            <PermIdentityIcon />
-          </ListItemIcon>
-          <Trans>None</Trans>
-        </MenuItem>
-      )}
-    </DropdownActions>
-  );
-}
-
-/* ========================================================================== */
 /*                         NFT Move to Profile Action                         */
 /* ========================================================================== */
 
@@ -183,8 +84,8 @@ type NFTMoveToProfileActionProps = {
 
 export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
   const { nfts, destination: defaultDestination, onComplete } = props;
-  const [isLoading, setIsLoading] = useState(false);
-  const [setNFTDID] = useSetNFTDIDMutation();
+
+  const [setNFTDID, { isLoading: isSetNFTDIDLoading }] = useSetNFTDIDMutation();
   const openDialog = useOpenDialog();
   const errorDialog = useShowError();
   const methods = useForm<NFTMoveToProfileFormData>({
@@ -197,7 +98,7 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
   const destination = methods.watch('destination');
   const { data: didWallets, isLoading: isLoadingDIDs } = useGetDIDsQuery();
   const { wallets: nftWallets, isLoading: isLoadingNFTWallets } = useGetNFTWallets();
-  const currentDIDId = nfts[0].ownerDid ? didToDIDId(stripHexPrefix(nfts[0].ownerDid)) : undefined;
+  const currentDIDId = nfts[0].ownerDid ? didToDIDId(removeHexPrefix(nfts[0].ownerDid)) : undefined;
   const [, setSelectedNFTIds] = useLocalStorage('gallery-selected-nfts', []);
 
   const inbox: Wallet | undefined = useMemo(() => {
@@ -264,18 +165,14 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
 
     if (confirmation) {
       try {
-        setIsLoading(true);
-
         const { error, data: response } = await setNFTDID({
           walletId: nfts[0].walletId,
-          nftLauncherId: stripHexPrefix(nfts[0].launcherId),
-          nftCoinIds: nfts.map((nft) => stripHexPrefix(nft.nftCoinId)),
+          nftCoinIds: nfts.map((nft) => removeHexPrefix(nft.nftCoinId)),
           did: destinationDID,
           fee: feeInBytes,
         });
-        const success = response?.success ?? false;
-        const errorMessage = error ?? undefined;
 
+        // TODO: this condition is never triggered, since the mutation never returns array
         if (Array.isArray(response)) {
           const successTransfers = response.filter((r: any) => r?.success === true);
           const failedTransfers = response.filter((r: any) => r?.success !== true);
@@ -297,14 +194,14 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
               </ErrorTextWrapper>
             </AlertDialog>
           );
-        } else if (success) {
+        } else if (!error) {
           openDialog(
             <AlertDialog title={<Trans>NFT Move Pending</Trans>}>
               <Trans>The NFT move transaction has been successfully submitted to the blockchain.</Trans>
             </AlertDialog>
           );
         } else {
-          const err = errorMessage || 'Unknown error';
+          const err = error?.message || 'Unknown error';
           openDialog(
             <AlertDialog title={<Trans>NFT Move Failed</Trans>}>
               <Trans>The NFT move failed: {err}</Trans>
@@ -312,8 +209,6 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
           );
         }
       } finally {
-        setIsLoading(false);
-
         if (onComplete) {
           onComplete();
         }
@@ -351,7 +246,7 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
             includeNoneOption={inbox !== undefined && currentDIDId !== undefined}
             variant="outlined"
             color="primary"
-            disabled={isLoading || isLoadingDIDs || isLoadingNFTWallets}
+            disabled={isSetNFTDIDLoading || isLoadingDIDs || isLoadingNFTWallets}
           />
         </Flex>
         <Flex flexDirection="column" gap={2}>
@@ -422,8 +317,8 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
           name="fee"
           color="secondary"
           label={<Trans>Fee</Trans>}
-          disabled={isLoading}
-          txType="assignDIDToNFT"
+          disabled={isSetNFTDIDLoading}
+          txType={FeeTxType.assignDIDToNFT}
           fullWidth
         />
         <DialogActions>
@@ -431,7 +326,7 @@ export function NFTMoveToProfileAction(props: NFTMoveToProfileActionProps) {
             <Button onClick={handleClose} color="secondary" variant="outlined" autoFocus>
               <Trans>Close</Trans>
             </Button>
-            <ButtonLoading type="submit" autoFocus color="primary" variant="contained" loading={isLoading}>
+            <ButtonLoading type="submit" autoFocus color="primary" variant="contained" loading={isSetNFTDIDLoading}>
               <Trans>Move</Trans>
             </ButtonLoading>
           </Flex>

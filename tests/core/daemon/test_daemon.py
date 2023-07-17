@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, replace
-from typing import Any, Dict, List, Optional, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import aiohttp
 import pytest
@@ -21,10 +21,24 @@ from hddcoin.server.outbound_message import NodeType
 from hddcoin.simulator.time_out_assert import time_out_assert, time_out_assert_custom_interval
 from hddcoin.types.peer_info import PeerInfo
 from hddcoin.util.ints import uint16
-from hddcoin.util.keychain import KeyData
+from hddcoin.util.keychain import Keychain, KeyData, supports_os_passphrase_storage
 from hddcoin.util.keyring_wrapper import DEFAULT_PASSPHRASE_IF_NO_MASTER_PASSPHRASE
 from hddcoin.util.ws_message import create_payload
 from tests.core.node_height import node_height_at_least
+from tests.util.misc import Marks, datacases
+
+
+@dataclass
+class RouteCase:
+    route: str
+    description: str
+    request: Dict[str, Any]
+    response: Dict[str, Any]
+    marks: Marks = ()
+
+    @property
+    def id(self) -> str:
+        return f"{self.route}: {self.description}"
 
 
 # Simple class that responds to a poll() call used by WebSocketServer.is_running()
@@ -165,9 +179,9 @@ def mock_daemon_with_services():
     # Mock daemon server with a couple running services, a plotter, and one stopped service
     return Daemon(
         services={
-            "my_refrigerator": Service(True),
-            "the_river": Service(True),
-            "your_nose": Service(False),
+            "my_refrigerator": [Service(True)],
+            "the_river": [Service(True)],
+            "your_nose": [Service(False)],
             "hddcoin_plotter": [Service(True), Service(True)],
         },
         connections={},
@@ -179,9 +193,9 @@ def mock_daemon_with_services_and_connections():
     # Mock daemon server with a couple running services, a plotter, and a couple active connections
     return Daemon(
         services={
-            "my_refrigerator": Service(True),
+            "my_refrigerator": [Service(True)],
             "hddcoin_plotter": [Service(True), Service(True)],
-            "apple": Service(True),
+            "apple": [Service(True)],
         },
         connections={
             "apple": [1],
@@ -777,3 +791,319 @@ async def test_key_label_methods(
     keychain.add_private_key(test_key_data.mnemonic_str(), "key_0")
     await ws.send_str(create_payload(method, parameter, "test", "daemon"))
     assert_response(await ws.receive(), response_data_dict)
+
+
+@pytest.mark.asyncio
+async def test_bad_json(daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain]) -> None:
+    ws, _ = daemon_connection_and_temp_keychain
+
+    await ws.send_str("{doo: '12'}")  # send some bad json
+    response = await ws.receive()
+
+    # check for error response
+    assert response.type == aiohttp.WSMsgType.TEXT
+    message = json.loads(response.data.strip())
+    assert message["data"]["success"] is False
+    assert message["data"]["error"].startswith("Expecting property name")
+
+    # properly register a service
+    service_name = "test_service"
+    data = {"service": service_name}
+    payload = create_payload("register_service", data, service_name, "daemon")
+    await ws.send_str(payload)
+    await ws.receive()
+
+    # send some more bad json
+    await ws.send_str("{doo: '12'}")  # send some bad json
+    response = await ws.receive()
+    assert response.type == aiohttp.WSMsgType.TEXT
+    message = json.loads(response.data.strip())
+    assert message["command"] != "register_service"
+    assert message["data"]["success"] is False
+    assert message["data"]["error"].startswith("Expecting property name")
+
+
+@datacases(
+    RouteCase(
+        route="register_service",
+        description="no service name",
+        request={
+            "fred": "barney",
+        },
+        response={"success": False},
+    ),
+    RouteCase(
+        route="register_service",
+        description="hddcoin_plotter",
+        request={
+            "service": "hddcoin_plotter",
+        },
+        response={"success": True, "service": "hddcoin_plotter", "queue": []},
+    ),
+    RouteCase(
+        route="unknown_command",
+        description="non-existant route",
+        request={},
+        response={"success": False, "error": "unknown_command unknown_command"},
+    ),
+    RouteCase(
+        route="running_services",
+        description="successful",
+        request={},
+        response={"success": True, "running_services": []},
+    ),
+    RouteCase(
+        route="keyring_status",
+        description="successful",
+        request={},
+        response={
+            "can_save_passphrase": supports_os_passphrase_storage(),
+            "can_set_passphrase_hint": True,
+            "is_keyring_locked": False,
+            "passphrase_hint": "",
+            "passphrase_requirements": {"is_optional": True, "min_length": 8},
+            "success": True,
+            "user_passphrase_is_set": False,
+        },
+    ),
+)
+@pytest.mark.asyncio
+async def test_misc_daemon_ws(
+    daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain],
+    case: RouteCase,
+) -> None:
+    ws, _ = daemon_connection_and_temp_keychain
+
+    payload = create_payload(case.route, case.request, "service_name", "daemon")
+    await ws.send_str(payload)
+    response = await ws.receive()
+
+    assert_response(response, case.response)
+
+
+@pytest.mark.asyncio
+async def test_unexpected_json(
+    daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain]
+) -> None:
+    ws, _ = daemon_connection_and_temp_keychain
+
+    await ws.send_str('{"this": "is valid but not expected"}')  # send some valid but unexpected json
+    response = await ws.receive()
+
+    # check for error response
+    assert response.type == aiohttp.WSMsgType.TEXT
+    message = json.loads(response.data.strip())
+    assert message["data"]["success"] is False
+    assert message["data"]["error"].startswith("'command'")
+
+
+@pytest.mark.parametrize(
+    "command_to_test",
+    [("start_service"), ("stop_service"), ("start_plotting"), ("stop_plotting"), ("is_running"), ("register_service")],
+)
+@pytest.mark.asyncio
+async def test_commands_with_no_data(
+    daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain], command_to_test: str
+) -> None:
+    ws, _ = daemon_connection_and_temp_keychain
+
+    payload = create_payload(command_to_test, {}, "service_name", "daemon")
+
+    await ws.send_str(payload)
+    response = await ws.receive()
+
+    assert_response(response, {"success": False, "error": f'{command_to_test} requires "data"'})
+
+
+@datacases(
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="no passphrase",
+        request={
+            "passphrase_hint": "this is a hint",
+            "save_passphrase": False,
+        },
+        response={"success": False, "error": "missing new_passphrase"},
+    ),
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="incorrect type",
+        request={
+            "passphrase_hint": "this is a hint",
+            "save_passphrase": False,
+            "new_passphrase": True,
+        },
+        response={"success": False, "error": "missing new_passphrase"},
+    ),
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="correct",
+        request={
+            "passphrase_hint": "this is a hint",
+            "new_passphrase": "this is a passphrase",
+        },
+        response={"success": True, "error": None},
+    ),
+)
+@pytest.mark.asyncio
+async def test_set_keyring_passphrase_ws(
+    daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain],
+    case: RouteCase,
+) -> None:
+    ws, _ = daemon_connection_and_temp_keychain
+
+    payload = create_payload(case.route, case.request, "service_name", "daemon")
+    await ws.send_str(payload)
+    response = await ws.receive()
+
+    assert_response(response, case.response)
+
+
+@datacases(
+    RouteCase(
+        route="remove_keyring_passphrase",
+        description="wrong current passphrase",
+        request={"current_passphrase": "wrong passphrase"},
+        response={"success": False, "error": "current passphrase is invalid"},
+    ),
+    RouteCase(
+        route="remove_keyring_passphrase",
+        description="incorrect type",
+        request={"current_passphrase": True},
+        response={"success": False, "error": "missing current_passphrase"},
+    ),
+    RouteCase(
+        route="remove_keyring_passphrase",
+        description="missing current passphrase",
+        request={},
+        response={"success": False, "error": "missing current_passphrase"},
+    ),
+    RouteCase(
+        route="remove_keyring_passphrase",
+        description="correct",
+        request={"current_passphrase": "this is a passphrase"},
+        response={"success": True, "error": None},
+    ),
+    RouteCase(
+        route="unlock_keyring",
+        description="wrong current passphrase",
+        request={"key": "wrong passphrase"},
+        response={"success": False, "error": "bad passphrase"},
+    ),
+    RouteCase(
+        route="unlock_keyring",
+        description="incorrect type",
+        request={"key": True},
+        response={"success": False, "error": "missing key"},
+    ),
+    RouteCase(
+        route="unlock_keyring",
+        description="missing data",
+        request={},
+        response={"success": False, "error": "missing key"},
+    ),
+    RouteCase(
+        route="unlock_keyring",
+        description="correct",
+        request={"key": "this is a passphrase"},
+        response={"success": True, "error": None},
+    ),
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="no current passphrase",
+        request={
+            "save_passphrase": False,
+            "new_passphrase": "another new passphrase",
+        },
+        response={"success": False, "error": "missing current_passphrase"},
+    ),
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="incorrect current passphrase",
+        request={
+            "save_passphrase": False,
+            "current_passphrase": "none",
+            "new_passphrase": "another new passphrase",
+        },
+        response={"success": False, "error": "current passphrase is invalid"},
+    ),
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="incorrect type",
+        request={
+            "save_passphrase": False,
+            "current_passphrase": False,
+            "new_passphrase": "another new passphrase",
+        },
+        response={"success": False, "error": "missing current_passphrase"},
+    ),
+    RouteCase(
+        route="set_keyring_passphrase",
+        description="correct",
+        request={
+            "save_passphrase": False,
+            "current_passphrase": "this is a passphrase",
+            "new_passphrase": "another new passphrase",
+        },
+        response={"success": True, "error": None},
+    ),
+)
+@pytest.mark.asyncio
+async def test_passphrase_apis(
+    daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain],
+    case: RouteCase,
+) -> None:
+    ws, keychain = daemon_connection_and_temp_keychain
+
+    keychain.set_master_passphrase(
+        current_passphrase=DEFAULT_PASSPHRASE_IF_NO_MASTER_PASSPHRASE, new_passphrase="this is a passphrase"
+    )
+
+    payload = create_payload(
+        case.route,
+        case.request,
+        "service_name",
+        "daemon",
+    )
+    await ws.send_str(payload)
+    response = await ws.receive()
+
+    assert_response(response, case.response)
+
+
+@datacases(
+    RouteCase(
+        route="unlock_keyring",
+        description="exception",
+        request={"key": "this is a passphrase"},
+        response={"success": False, "error": "validation exception"},
+    ),
+    RouteCase(
+        route="validate_keyring_passphrase",
+        description="exception",
+        request={"key": "this is a passphrase"},
+        response={"success": False, "error": "validation exception"},
+    ),
+)
+@pytest.mark.asyncio
+async def test_keyring_file_deleted(
+    daemon_connection_and_temp_keychain: Tuple[aiohttp.ClientWebSocketResponse, Keychain],
+    case: RouteCase,
+) -> None:
+    ws, keychain = daemon_connection_and_temp_keychain
+
+    keychain.set_master_passphrase(
+        current_passphrase=DEFAULT_PASSPHRASE_IF_NO_MASTER_PASSPHRASE, new_passphrase="this is a passphrase"
+    )
+    keychain.keyring_wrapper.keyring.keyring_path.unlink()
+
+    payload = create_payload(
+        case.route,
+        case.request,
+        "service_name",
+        "daemon",
+    )
+    await ws.send_str(payload)
+    response = await ws.receive()
+
+    assert_response(response, case.response)

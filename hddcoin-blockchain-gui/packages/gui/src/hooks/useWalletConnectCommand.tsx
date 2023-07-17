@@ -1,16 +1,14 @@
-import api, {
-  store,
-  useGetLoggedInFingerprintQuery,
-  useLogInAndSkipImportMutation,
-  useGetKeysQuery,
-} from '@hddcoin-network/api-react';
-import { useOpenDialog, ConfirmDialog, Flex } from '@hddcoin-network/core';
+import api, { store, useGetLoggedInFingerprintQuery, useLogInMutation } from '@hddcoin-network/api-react';
+import { useOpenDialog } from '@hddcoin-network/core';
 import { Trans } from '@lingui/macro';
-import { Divider, Typography } from '@mui/material';
 import debug from 'debug';
-import React, { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 
-import WalletConnectMetadata from '../components/walletConnect/WalletConnectMetadata';
+import type Notification from '../@types/Notification';
+import type Pair from '../@types/Pair';
+import type WalletConnectCommandParam from '../@types/WalletConnectCommandParam';
+import WalletConnectConfirmDialog from '../components/walletConnect/WalletConnectConfirmDialog';
+import NotificationType from '../constants/NotificationType';
 import walletConnectCommands from '../constants/WalletConnectCommands';
 import prepareWalletConnectCommand from '../util/prepareWalletConnectCommand';
 import waitForWalletSync from '../util/waitForWalletSync';
@@ -19,118 +17,143 @@ import useWalletConnectPreferences from './useWalletConnectPreferences';
 
 const log = debug('hddcoin-gui:walletConnectCommand');
 
-/*
-export const STANDARD_ERROR_MAP = {
-  [PARSE_ERROR]: { code: -32700, message: "Parse error" },
-  [INVALID_REQUEST]: { code: -32600, message: "Invalid Request" },
-  [METHOD_NOT_FOUND]: { code: -32601, message: "Method not found" },
-  [INVALID_PARAMS]: { code: -32602, message: "Invalid params" },
-  [INTERNAL_ERROR]: { code: -32603, message: "Internal error" },
-  [SERVER_ERROR]: { code: -32000, message: "Server error" },
+type UseWalletConnectCommandOptions = {
+  onNotification?: (notification: Notification) => void;
 };
-*/
 
-export default function useWalletConnectCommand() {
+function parseNotification(
+  fingerprint: number,
+  values: Record<string, string | number | boolean>,
+  pair: Pair
+): Notification {
+  const { type, allFingerprints, offerData } = values;
+
+  const from = pair.metadata?.name ?? <Trans>Unknown Dapp</Trans>;
+  const timestamp = Math.floor(new Date().getTime() / 1000);
+  const fingerprints = allFingerprints ? pair.fingerprints : [fingerprint];
+
+  const base = {
+    from,
+    timestamp,
+    fingerprints,
+  };
+
+  const uniqueRandomId = `wc-${new Date().getTime()}-${Math.floor(Math.random() * 1_000_000_000)}`;
+
+  if (type === NotificationType.OFFER) {
+    if (!offerData) {
+      throw new Error('Notification missing offerData');
+    }
+
+    return {
+      ...base,
+      type,
+      source: 'WALLET_CONNECT',
+      id: uniqueRandomId,
+      offerData: offerData.toString(),
+    };
+  }
+
+  if (type === NotificationType.ANNOUNCEMENT && 'message' in values) {
+    return {
+      ...base,
+      type,
+      source: 'WALLET_CONNECT',
+      id: uniqueRandomId,
+      message: values.message.toString(),
+      url: 'url' in values ? values.url.toString() : undefined,
+    };
+  }
+
+  throw new Error(`Invalid notification type ${type}`);
+}
+
+export default function useWalletConnectCommand(options: UseWalletConnectCommandOptions) {
+  const { onNotification } = options;
   const openDialog = useOpenDialog();
-  const [logIn] = useLogInAndSkipImportMutation();
+  const [logIn] = useLogInMutation();
   const { data: currentFingerprint, isLoading: isLoadingLoggedInFingerprint } = useGetLoggedInFingerprintQuery();
   const { getPairBySession } = useWalletConnectPairs();
-  const { data: keys, isLoading: isLoadingPublicKeys } = useGetKeysQuery();
+
   const { allowConfirmationFingerprintChange } = useWalletConnectPreferences();
 
-  const isLoading = isLoadingLoggedInFingerprint || isLoadingPublicKeys;
+  const isLoading = isLoadingLoggedInFingerprint;
 
   async function confirm(props: {
     topic: string;
     message: ReactNode;
-    params: {
-      label: ReactNode;
-      value: ReactNode;
-      displayComponent?: (value: ReactNode) => ReactNode;
-    }[];
+    params: WalletConnectCommandParam[];
+    values: Record<string, any>;
     fingerprint: number;
     isDifferentFingerprint: boolean;
+    command: string;
+    bypassConfirm?: boolean;
+    onChange: (values: Record<string, any>) => void;
   }) {
-    const { topic, message, params = [], fingerprint, isDifferentFingerprint } = props;
-
-    /*
-    const { autoConfirm } = state.current;
-    if (autoConfirm) {
-      return true;
-    }
-    */
-
-    const key = keys?.find((item) => item.fingerprint === fingerprint);
+    const {
+      topic,
+      message,
+      params = [],
+      values,
+      fingerprint,
+      isDifferentFingerprint,
+      command,
+      bypassConfirm = false,
+      onChange,
+    } = props;
 
     const pair = getPairBySession(topic);
     if (!pair) {
       throw new Error('Invalid session topic');
     }
 
+    if (pair.bypassCommands && command in pair.bypassCommands) {
+      log(`bypassing command ${command} with value ${pair.bypassCommands[command]}`);
+      return pair.bypassCommands[command];
+    }
+
     const isConfirmed = await openDialog(
-      <ConfirmDialog
-        title={<Trans>Confirmation Request</Trans>}
-        confirmColor="primary"
-        confirmTitle={<Trans>Confirm</Trans>}
-        cancelTitle={<Trans>Reject</Trans>}
-      >
-        <Flex flexDirection="column" gap={2}>
-          <Typography variant="body1">{message}</Typography>
-
-          {params.length > 0 && (
-            <Flex flexDirection="column" gap={2}>
-              {params.map(({ label, value, displayComponent }) => (
-                <Flex flexDirection="column" key={label}>
-                  <Typography color="textPrimary">{label}</Typography>
-                  <Typography color="textSecondary">
-                    {displayComponent ? displayComponent(value) : value?.toString() ?? <Trans>Not Available</Trans>}
-                  </Typography>
-                </Flex>
-              ))}
-            </Flex>
-          )}
-
-          <Divider />
-          <Flex flexDirection="column" gap={1}>
-            <Typography variant="body1" color="textPrimary">
-              <Trans>Key</Trans>
-            </Typography>
-            {!!key && (
-              <Typography variant="body1" color={isDifferentFingerprint ? 'warning' : 'textSecondary'}>
-                {key.label ?? <Trans>Wallet</Trans>}
-              </Typography>
-            )}
-
-            <Typography variant="body2" color={isDifferentFingerprint ? 'warning' : 'textSecondary'}>
-              {fingerprint}
-            </Typography>
-          </Flex>
-
-          <Divider />
-
-          <Flex flexDirection="column" gap={1}>
-            <Typography variant="body1" color="textPrimary">
-              <Trans>Application</Trans>
-            </Typography>
-            <WalletConnectMetadata metadata={pair.metadata} />
-          </Flex>
-        </Flex>
-      </ConfirmDialog>
+      <WalletConnectConfirmDialog
+        topic={topic}
+        command={command}
+        message={message}
+        fingerprint={fingerprint}
+        isDifferentFingerprint={isDifferentFingerprint}
+        bypassConfirm={bypassConfirm}
+        params={params}
+        values={values}
+        onChange={onChange}
+      />
     );
 
     return isConfirmed;
   }
 
   async function handleProcess(topic: string, requestedCommand: string, requestedParams: any) {
-    const { command, params, definition } = prepareWalletConnectCommand(
-      walletConnectCommands,
-      requestedCommand,
-      requestedParams
-    );
+    const {
+      command,
+      values: defaultValues,
+      definition,
+    } = prepareWalletConnectCommand(walletConnectCommands, requestedCommand, requestedParams);
+
+    const { fingerprint } = requestedParams;
+
+    if (command === 'showNotification') {
+      const pair = getPairBySession(topic);
+      if (!pair) {
+        throw new Error('Invalid session topic');
+      }
+
+      const notification = parseNotification(fingerprint, defaultValues, pair);
+      onNotification?.(notification);
+
+      return {
+        success: true,
+      };
+    }
 
     // validate fingerprint for current command
     const { allFingerprints, waitForSync } = definition;
-    const { fingerprint } = requestedParams;
     const isDifferentFingerprint = fingerprint !== currentFingerprint;
     if (!allFingerprints) {
       if (isDifferentFingerprint && !allowConfirmationFingerprintChange) {
@@ -138,26 +161,15 @@ export default function useWalletConnectCommand() {
       }
     }
 
-    const confirmParams: {
-      label: ReactNode;
-      value: ReactNode;
-      displayComponent?: (value: any) => ReactNode;
-    }[] = [];
+    const { params: definitionParams = [], bypassConfirm } = definition;
 
-    const { params: definitionParams = [] } = definition;
-    definitionParams.forEach((param) => {
-      const { name, label, displayComponent, hide } = param;
+    log('Confirm arguments', definitionParams);
 
-      if (name in params && !hide) {
-        confirmParams.push({
-          label: label ?? name,
-          value: params[name],
-          displayComponent,
-        });
-      }
-    });
+    let values = defaultValues;
 
-    log('Confirm arguments', confirmParams);
+    function handleChangeParam(newValues: Record<string, any>) {
+      values = newValues;
+    }
 
     const confirmed = await confirm({
       topic,
@@ -169,9 +181,13 @@ export default function useWalletConnectCommand() {
         ) : (
           <Trans>Do you want to execute command {command}?</Trans>
         ),
-      params: confirmParams,
+      params: definitionParams,
+      values,
       fingerprint,
       isDifferentFingerprint,
+      command,
+      bypassConfirm,
+      onChange: handleChangeParam,
     });
 
     if (!confirmed) {
@@ -183,6 +199,7 @@ export default function useWalletConnectCommand() {
       log('Changing fingerprint', fingerprint);
       await logIn({
         fingerprint,
+        type: 'skip',
       }).unwrap();
     }
 
@@ -203,8 +220,8 @@ export default function useWalletConnectCommand() {
     }
 
     // execute command
-    log('Executing', command, params);
-    const resultPromise = store.dispatch(api.endpoints[command].initiate(params));
+    log('Executing', command, values);
+    const resultPromise = store.dispatch(api.endpoints[command].initiate(values));
     const result = await resultPromise;
     log('Result', result);
 

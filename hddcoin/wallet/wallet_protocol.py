@@ -8,18 +8,18 @@ from typing_extensions import Protocol
 from hddcoin.server.ws_connection import WSHDDcoinConnection
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.util.ints import uint8, uint32, uint64, uint128
+from hddcoin.util.ints import uint32, uint64, uint128
+from hddcoin.wallet.util.wallet_types import WalletType
 from hddcoin.wallet.wallet_coin_record import WalletCoinRecord
+from hddcoin.wallet.wallet_info import WalletInfo
 
 if TYPE_CHECKING:
     from hddcoin.wallet.wallet_state_manager import WalletStateManager
 
 
 class WalletProtocol(Protocol):
-
-    # TODO: it seems like this should return WalletType instead
     @classmethod
-    def type(cls) -> uint8:
+    def type(cls) -> WalletType:
         ...
 
     def id(self) -> uint32:
@@ -64,6 +64,7 @@ class WalletProtocol(Protocol):
     def get_name(self) -> str:
         ...
 
+    wallet_info: WalletInfo
     # WalletStateManager is only imported for type hinting thus leaving pylint
     # unable to process this
     wallet_state_manager: WalletStateManager  # pylint: disable=used-before-assignment

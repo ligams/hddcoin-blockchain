@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, Optional
+from typing import Optional
 
 from hddcoin.protocols import timelord_protocol
-from hddcoin.timelord.timelord import Chain, IterationType, Timelord, iters_from_block
+from hddcoin.rpc.rpc_server import StateChangedProtocol
+from hddcoin.timelord.iters_from_block import iters_from_block
+from hddcoin.timelord.timelord import Timelord
+from hddcoin.timelord.types import Chain, IterationType
 from hddcoin.util.api_decorators import api_request
 from hddcoin.util.ints import uint64
 
@@ -18,7 +21,7 @@ class TimelordAPI:
     def __init__(self, timelord) -> None:
         self.timelord = timelord
 
-    def _set_state_changed_callback(self, callback: Callable):
+    def _set_state_changed_callback(self, callback: StateChangedProtocol) -> None:
         self.timelord.state_changed_callback = callback
 
     @api_request()
@@ -28,6 +31,7 @@ class TimelordAPI:
         async with self.timelord.lock:
             if self.timelord.bluebox_mode:
                 return None
+            self.timelord.max_allowed_inactivity_time = 60
             if new_peak.reward_chain_block.weight > self.timelord.last_state.get_weight():
                 log.info("Not skipping peak, don't have. Maybe we are not the fastest timelord")
                 log.info(
@@ -42,12 +46,10 @@ class TimelordAPI:
             ):
                 log.info("Skipping peak, already have.")
                 self.timelord.state_changed("skipping_peak", {"height": new_peak.reward_chain_block.height})
-                return None
             else:
                 log.warning("block that we don't have, changing to it.")
                 self.timelord.new_peak = new_peak
                 self.timelord.state_changed("new_peak", {"height": new_peak.reward_chain_block.height})
-                self.timelord.new_subslot_end = None
 
     @api_request()
     async def new_unfinished_block_timelord(self, new_unfinished_block: timelord_protocol.NewUnfinishedBlockTimelord):

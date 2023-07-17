@@ -1,3 +1,4 @@
+import { OfferSummaryRecord } from '@hddcoin-network/api';
 import { byteToCAT, byteToHDDcoin } from '@hddcoin-network/core';
 import BigNumber from 'bignumber.js';
 
@@ -5,12 +6,19 @@ import type OfferBuilderData from '../@types/OfferBuilderData';
 import type OfferSummary from '../@types/OfferSummary';
 import { launcherIdToNFTId } from './nfts';
 
-export default function offerToOfferBuilderData(offerSummary: OfferSummary): OfferBuilderData {
+export default function offerToOfferBuilderData(
+  offerSummary: OfferSummary | OfferSummaryRecord,
+  setDefaultOfferedFee?: boolean,
+  defaultFee?: string // in bytes
+): OfferBuilderData {
   const { fees, offered, requested, infos } = offerSummary;
+
+  const defaultFeeHDD = defaultFee ? byteToHDDcoin(defaultFee).toFixed() : '';
 
   const offeredHdd: OfferBuilderData['offered']['hdd'] = [];
   const offeredTokens: OfferBuilderData['offered']['tokens'] = [];
   const offeredNfts: OfferBuilderData['offered']['nfts'] = [];
+  const offeredFee: OfferBuilderData['offered']['fee'] = setDefaultOfferedFee ? [{ amount: defaultFeeHDD }] : [];
   const requestedHdd: OfferBuilderData['requested']['hdd'] = [];
   const requestedTokens: OfferBuilderData['requested']['tokens'] = [];
   const requestedNfts: OfferBuilderData['requested']['nfts'] = [];
@@ -62,7 +70,7 @@ export default function offerToOfferBuilderData(offerSummary: OfferSummary): Off
       hdd: offeredHdd,
       tokens: offeredTokens,
       nfts: offeredNfts,
-      fee: [],
+      fee: offeredFee,
     },
     requested: {
       hdd: requestedHdd,

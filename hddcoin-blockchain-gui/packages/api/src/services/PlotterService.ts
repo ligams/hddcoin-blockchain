@@ -1,4 +1,6 @@
+import PlotQueueItem from '../@types/PlotQueueItem';
 import Client from '../Client';
+import type Message from '../Message';
 import ServiceName from '../constants/ServiceName';
 import Service from './Service';
 import type { Options } from './Service';
@@ -45,8 +47,9 @@ function addPlotProgress(queue: PlotQueueItem[]): PlotQueueItem[] {
 }
 
 function mergeQueue(
+  // partialQueue does not contain `log` property. currentQueue and the result contains it
   currentQueue: PlotQueueItem[],
-  partialQueue: PlotQueueItemPartial[],
+  partialQueue: PlotQueueItem[],
   isLogChange: boolean
 ): PlotQueueItem[] {
   let result = [...currentQueue];
@@ -80,19 +83,19 @@ function mergeQueue(
 }
 
 export default class Plotter extends Service {
-  private queue: Object[] | undefined;
+  private queue: PlotQueueItem[] | undefined;
 
   constructor(client: Client, options?: Options) {
     super(ServiceName.PLOTTER, client, options, async () => {
       this.onLogChanged((data: any) => {
         const { queue } = data;
-        this.queue = mergeQueue(this.queue, queue, true);
+        this.queue = mergeQueue(this.queue || [], queue, true);
         this.emit('queue_changed', this.queue, null);
       });
 
       this.onPlotQueueStateChange((data: any) => {
         const { queue } = data;
-        this.queue = mergeQueue(this.queue, queue);
+        this.queue = mergeQueue(this.queue || [], queue, false);
         this.emit('queue_changed', this.queue, null);
       });
 
@@ -102,96 +105,6 @@ export default class Plotter extends Service {
       }
     });
   }
-  /*
-  startPlotting(
-    plotterName, // plotterName
-    k, // plotSize
-    n, // plotCount
-    t, // workspaceLocation
-    t2, // workspaceLocation2
-    d, // finalLocation
-    b, // maxRam
-    u, // numBuckets
-    r, // numThreads,
-    queue, // queue
-    a, // fingerprint
-    parallel, // parallel
-    delay, // delay
-    e, // disableBitfieldPlotting
-    x, // excludeFinalDir
-    overrideK, //overrideK
-    f, // farmerPublicKey
-    p, // poolPublicKey
-    c, // poolContractAddress
-    m, // bladebitDisableNUMA,
-    w, // bladebitWarmStart,
-    v, // madmaxNumBucketsPhase3,
-    G, // madmaxTempToggle,
-    K, // madmaxThreadMultiplier,
-  ) {
-    const args = {
-      plotter: plotterName,
-      k,
-      n,
-      t,
-      t2,
-      d,
-      b,
-      u,
-      r,
-      queue,
-      parallel,
-      delay,
-      e,
-      x,
-      overrideK,
-    };
-  
-    if (a) {
-      args.a = a;
-    }
-  
-    if (f) {
-      args.f = f;
-    }
-  
-    if (p) {
-      args.p = p;
-    }
-  
-    if (c) {
-      args.c = c;
-    }
-  
-    if (m) { // bladebitDisableNUMA
-      args.m = m;
-    }
-  
-    if (w) { // bladebitWarmStart
-      args.w = w;
-    }
-  
-    if (v) { // madmaxNumBucketsPhase3
-      args.v = v;
-    }
-  
-    if (G) { // madmaxTempToggle
-      args.G = G;
-    }
-  
-    if (K) { // madmaxThreadMultiplier
-      args.K = K;
-    }
-
-    return this.command('start_plotting', args, undefined, undefined, true);  
-  }
-
-  stopPlotting(id: string) {
-    return this.command('stop_plotting', {
-      id,
-    });
-  }
-  */
 
   async getQueue() {
     await this.whenReady();

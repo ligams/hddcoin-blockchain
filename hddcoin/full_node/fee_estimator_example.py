@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from hddcoin.full_node.fee_estimate import FeeEstimateV2
-from hddcoin.full_node.fee_estimation import FeeBlockInfo, FeeMempoolInfo
+from hddcoin.full_node.fee_estimation import FeeBlockInfo, FeeMempoolInfo, MempoolItemInfo
 from hddcoin.full_node.fee_estimator_interface import FeeEstimatorInterface
 from hddcoin.types.clvm_cost import CLVMCost
 from hddcoin.types.fee_rate import FeeRateV2
-from hddcoin.types.mempool_item import MempoolItem
 from hddcoin.util.ints import uint64
 
 MIN_BYTE_PER_COST = 5
@@ -31,10 +30,10 @@ class FeeEstimatorExample(FeeEstimatorInterface):
     def new_block(self, block_info: FeeBlockInfo) -> None:
         pass
 
-    def add_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItem) -> None:
+    def add_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItemInfo) -> None:
         pass
 
-    def remove_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItem) -> None:
+    def remove_mempool_item(self, mempool_info: FeeMempoolInfo, mempool_item: MempoolItemInfo) -> None:
         pass
 
     def estimate_fee_rate(self, *, time_offset_seconds: int) -> FeeRateV2:

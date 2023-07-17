@@ -12,11 +12,11 @@
     "build": "npm run locale && npm run build:js",
     "build:js": "rollup -c",
     "build:watch": "rollup -c -w",
-    "build:types": "tsc --emitDeclarationOnly",
+    "build:ci": "npm run locale:compile && npm run build:js",
     "locale:extract": "lingui extract",
     "locale:clean": "lingui extract --clean",
     "locale:compile": "lingui compile",
-    "locale": "lingui extract && lingui compile",
+    "locale": "npm run locale:extract && npm run locale:compile",
     "check:types": "tsc --noEmit --emitDeclarationOnly false",
     "test": "jest"
   },
@@ -44,11 +44,11 @@
     "react-use": "17.3.2",
     "react-use-timeout": "1.0.0",
     "use-dark-mode": "2.3.1",
-    "validator": "13.7.0",
+    "validator": "13.9.0",
     "victory": "36.6.6"
   },
   "devDependencies": {
-    "@babel/core": "7.16.7",
+    "@babel/core": "7.21.0",
     "@babel/helper-get-function-arity": "^7.16.7",
     "@babel/plugin-transform-runtime": "7.16.8",
     "@babel/preset-env": "7.16.8",
@@ -76,6 +76,7 @@
     "@types/react": "17.0.38",
     "@types/react-dom": "17.0.11",
     "@types/react-router-dom": "5.3.2",
+    "@types/validator": "13.7.17",
     "babel-plugin-macros": "3.1.0",
     "babel-plugin-styled-components": "2.0.2",
     "babel-plugin-transform-imports": "2.0.0",
@@ -87,7 +88,7 @@
     "rollup": "2.64.0",
     "rollup-plugin-node-externals": "3.1.2",
     "styled-components": "5.3.3",
-    "typescript": "4.5.4"
+    "typescript": "4.9.5"
   },
   "peerDependencies": {
     "@hddcoin-network/api-react": "1.0.0",

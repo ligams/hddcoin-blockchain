@@ -7,21 +7,7 @@ import type OfferBuilderData from '../../@types/OfferBuilderData';
 import OfferState from '../offers/OfferState';
 import OfferBuilderProvider from './OfferBuilderProvider';
 import OfferBuilderTradeColumn from './OfferBuilderTradeColumn';
-
-export const emptyDefaultValues = {
-  offered: {
-    hdd: [],
-    tokens: [],
-    nfts: [],
-    fee: [],
-  },
-  requested: {
-    hdd: [],
-    tokens: [],
-    nfts: [],
-    fee: [],
-  },
-};
+import { emptyDefaultValues } from './utils/defaultValues';
 
 export type OfferBuilderProps = {
   isMyOffer?: boolean;
@@ -60,15 +46,16 @@ function OfferBuilder(props: OfferBuilderProps, ref: any) {
         formRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
       }
     },
+    getValues: () => methods.getValues(),
   }));
 
   const offerColumn = (
-    <Grid xs={12} md={6} item>
+    <Grid xs={12} md={6} item key={`offered-${viewer}-${isMyOffer}`}>
       <OfferBuilderTradeColumn name="offered" viewer={viewer} isMyOffer={isMyOffer} offering />
     </Grid>
   );
   const requestColumn = (
-    <Grid xs={12} md={6} item>
+    <Grid xs={12} md={6} item key={`requested-${viewer}-${isMyOffer}`}>
       <OfferBuilderTradeColumn name="requested" viewer={viewer} isMyOffer={isMyOffer} />
     </Grid>
   );

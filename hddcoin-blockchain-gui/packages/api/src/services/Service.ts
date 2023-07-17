@@ -4,23 +4,23 @@ import { isUndefined, omitBy } from 'lodash';
 
 import type Client from '../Client';
 import Message from '../Message';
-import ServiceName from '../constants/ServiceName';
+import { type ServiceNameValue } from '../constants/ServiceName';
 
 export type Options = {
-  origin?: ServiceName;
+  origin?: ServiceNameValue;
   skipAddService?: boolean;
 };
 
-export default class Service extends EventEmitter {
+export default abstract class Service extends EventEmitter {
   readonly client: Client;
 
-  readonly name: ServiceName;
+  readonly name: ServiceNameValue;
 
-  readonly origin: ServiceName;
+  readonly origin: ServiceNameValue;
 
   #readyPromise: Promise<null> | undefined;
 
-  constructor(name: ServiceName, client: Client, options: Options = {}, onInit?: () => Promise<void>) {
+  constructor(name: ServiceNameValue, client: Client, options: Options = {}, onInit?: () => Promise<void>) {
     super();
 
     const { origin, skipAddService } = options;
@@ -30,7 +30,7 @@ export default class Service extends EventEmitter {
     this.origin = origin ?? client.origin;
 
     if (!skipAddService) {
-      client.addService(this);
+      client.addService({ service: this });
     }
 
     client.on('message', this.handleMessage);
@@ -76,13 +76,13 @@ export default class Service extends EventEmitter {
     }
   }
 
-  async command<Response>(
+  async command<Data>(
     command: string,
     data: Object = {},
     ack = false,
     timeout?: number,
     disableFormat?: boolean
-  ): Promise<Response> {
+  ): Promise<Data> {
     const { client, origin, name } = this;
 
     if (!command) {
@@ -104,19 +104,17 @@ export default class Service extends EventEmitter {
       disableFormat
     );
 
-    return response?.data;
+    return response?.data as Data;
   }
 
-  async ping(): Promise<{
-    success: boolean;
-  }> {
-    return this.command('ping', undefined, undefined, 1000);
+  async ping() {
+    return this.command<void>('ping', undefined, undefined, 1000);
   }
 
   onCommand(
     command: string,
     callback: (data: any, message: Message) => void,
-    processData?: (data: any) => any
+    processData?: (data: any, message: Message) => any
   ): () => void {
     function handleCommand(data: any, message: Message) {
       const updatedData = processData ? processData(data, message) : data;

@@ -55,9 +55,11 @@ export default function WalletCATTAILDialog(props: Props) {
                 multiline
               />
             </Box>
-            {/* <Link href={`https://www.taildatabase.com/tail/${wallet.meta?.assetId}`} target="_blank" variant="body2">
+			{/*
+            <Link href={`https://www.taildatabase.com/tail/${wallet.meta?.assetId}`} target="_blank" variant="body2">
               <Trans>Search on Tail Database</Trans>
-            </Link> */}
+            </Link>
+			*/}
           </Flex>
         )}
       </DialogContent>

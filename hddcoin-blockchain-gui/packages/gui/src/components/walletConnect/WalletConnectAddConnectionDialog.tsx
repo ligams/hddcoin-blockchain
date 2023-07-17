@@ -39,7 +39,7 @@ export default function WalletConnectAddConnectionDialog(props: WalletConnectAdd
 
   const [step, setStep] = useState<Step>(Step.CONNECT);
   const { pair, isLoading: isLoadingWallet } = useWalletConnectContext();
-  const { data: keys, isLoading: isLoadingPublicKeys } = useGetKeysQuery();
+  const { data: keys, isLoading: isLoadingPublicKeys } = useGetKeysQuery({});
   const { data: fingerprint, isLoading: isLoadingLoggedInFingerprint } = useGetLoggedInFingerprintQuery();
   const mainnet = useCurrencyCode() === 'HDD';
   const methods = useForm<FormData>({

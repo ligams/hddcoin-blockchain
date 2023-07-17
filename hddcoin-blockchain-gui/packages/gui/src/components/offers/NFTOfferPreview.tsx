@@ -1,10 +1,10 @@
-import { useGetNFTInfoQuery } from '@hddcoin-network/api-react';
 import { Button, Flex, Loading, TooltipIcon, useColorModeValue } from '@hddcoin-network/core';
 import { Trans, t } from '@lingui/macro';
 import { Card, Grid, Typography } from '@mui/material';
 import React from 'react';
 import styled from 'styled-components';
 
+import useNFT from '../../hooks/useNFT';
 import useViewNFTOnExplorer, { NFTExplorer } from '../../hooks/useViewNFTOnExplorer';
 import { launcherIdFromNFTId } from '../../util/nfts';
 import NFTCard from '../nfts/NFTCard';
@@ -35,7 +35,7 @@ type NFTOfferPreviewProps = {
 export default function NFTOfferPreview(props: NFTOfferPreviewProps) {
   const { nftId } = props;
   const launcherId = launcherIdFromNFTId(nftId ?? '');
-  const { data: nft, isLoading: isLoadingNFT, error: rawError } = useGetNFTInfoQuery({ coinId: launcherId ?? '' });
+  const { nft, isLoading: isLoadingNFT, error: rawError } = useNFT(nftId);
   const viewOnExplorer = useViewNFTOnExplorer();
   let error = rawError?.message ?? '';
 
@@ -68,7 +68,7 @@ export default function NFTOfferPreview(props: NFTOfferPreviewProps) {
       return (
         <Grid xs={12} item>
           <NFTCard
-            nft={nft}
+            id={nft.launcherId}
             canExpandDetails={false}
             availableActions={
               NFTContextualActionTypes.CopyNFTId +
@@ -141,7 +141,7 @@ export default function NFTOfferPreview(props: NFTOfferPreviewProps) {
               </Trans>
             </TooltipIcon>
           </Flex>
-		  {/*
+          {/*
           <Button
             variant="outlined"
             color="primary"
@@ -162,7 +162,7 @@ export default function NFTOfferPreview(props: NFTOfferPreviewProps) {
               <Trans>Check Provenance on Spacescan.io</Trans>
             </Typography>
           </Button>
-		  */}
+          */}
         </Flex>
       )}
     </StyledPreviewContainer>

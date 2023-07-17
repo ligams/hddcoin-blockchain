@@ -6,7 +6,8 @@ from typing import List, Optional, Tuple, Union
 from clvm.casts import int_to_bytes
 
 from hddcoin.full_node.generator import create_compressed_generator
-from hddcoin.types.blockchain_format.program import Program, SerializedProgram
+from hddcoin.types.blockchain_format.program import Program
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.coin_spend import CoinSpend
 from hddcoin.types.generator_types import BlockGenerator, CompressorArg
 from hddcoin.types.spend_bundle import SpendBundle

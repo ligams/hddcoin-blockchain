@@ -17,13 +17,15 @@ This library provides support for TypeScript/JavaScript [HDDcoin](https://www.hd
 ## Example
 
 ```ts
-import Client, { Wallet } from '@hddcoin-network/api';
+import { readFileSync } from "fs";
+import Client, { Wallet } from '@hddcoin-network/api'; // or from "../hddcoin-blockchain/hddcoin-blockchain-gui/packages/api";
 import Websocket from 'ws';
 import sleep from 'sleep-promise';
 
 (async () => {
   const client = new Client({
-    url: 'wss://127.0.0.1:54000',
+    url: 'wss://127.0.0.1:25400',
+    // key and crt files should be in your homedir in: .hddcoin/mainnet/config/ssl/daemon/
     cert: readFileSync('private_cert.crt'),
     key: readFileSync('private_key.key'),
     webSocket: Websocket;

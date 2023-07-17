@@ -1,6 +1,5 @@
-import type { Wallet } from '@hddcoin-network/api';
 import { OfferSummaryRecord, OfferTradeRecord } from '@hddcoin-network/api';
-import { useCheckOfferValidityMutation, useGetNFTInfoQuery, useGetNFTWallets } from '@hddcoin-network/api-react';
+import { useCheckOfferValidityMutation, useGetWalletsQuery } from '@hddcoin-network/api-react';
 import {
   Back,
   Button,
@@ -30,9 +29,11 @@ import styled from 'styled-components';
 
 import useAcceptOfferHook from '../../hooks/useAcceptOfferHook';
 import useAssetIdName from '../../hooks/useAssetIdName';
-import useFetchNFTs from '../../hooks/useFetchNFTs';
+import useNFT from '../../hooks/useNFT';
+import useNFTs from '../../hooks/useNFTs';
+import useWalletOffers from '../../hooks/useWalletOffers';
 import { convertRoyaltyToPercentage, launcherIdToNFTId } from '../../util/nfts';
-import { stripHexPrefix } from '../../util/utils';
+import removeHexPrefix from '../../util/removeHexPrefix';
 import NFTOfferExchangeType from './NFTOfferExchangeType';
 import NFTOfferPreview from './NFTOfferPreview';
 import OfferAsset from './OfferAsset';
@@ -248,13 +249,12 @@ export function NFTOfferSummary(props: NFTOfferSummaryProps) {
     showMakerFee = true,
     overrideNFTSellerAmount,
   } = props;
-  const { lookupByAssetId } = useAssetIdName();
-  const { wallets: nftWallets } = useGetNFTWallets();
-  const { nfts, isLoading: isLoadingNFTs } = useFetchNFTs(nftWallets.map((wallet: Wallet) => wallet.id));
+  const { lookupByAssetId, isLoading: isLoadingAssetIdName } = useAssetIdName();
+  const { nfts, isLoading: isLoadingNFTs } = useNFTs();
   const makerEntries: [string, number][] = Object.entries(summary.offered);
   const takerEntries: [string, number][] = Object.entries(summary.requested);
   const [takerUnknownAssets, makerUnknownAssets] = useMemo(() => {
-    if (isMyOffer || isLoadingNFTs) {
+    if (isMyOffer || isLoadingNFTs || isLoadingAssetIdName) {
       return [];
     }
     const takerUnknownAssetsLocal = makerEntries
@@ -269,7 +269,7 @@ export function NFTOfferSummary(props: NFTOfferSummaryProps) {
         const assetType = offerAssetTypeForAssetId(assetId, summary);
         if (assetType === OfferAsset.NFT) {
           return (
-            nfts.find((nft) => stripHexPrefix(nft.launcherId.toLowerCase()) === assetId.toLowerCase()) === undefined
+            nfts.find((nft) => removeHexPrefix(nft.launcherId.toLowerCase()) === assetId.toLowerCase()) === undefined
           );
         }
         return lookupByAssetId(assetId) === undefined;
@@ -277,7 +277,7 @@ export function NFTOfferSummary(props: NFTOfferSummaryProps) {
       .map(([assetId]) => assetId);
 
     return [takerUnknownAssetsLocal, makerUnknownAssetsLocal];
-  }, [isMyOffer, isLoadingNFTs, makerEntries, takerEntries, summary, lookupByAssetId, nfts]);
+  }, [isMyOffer, isLoadingNFTs, makerEntries, takerEntries, summary, lookupByAssetId, nfts, isLoadingAssetIdName]);
   const makerSummary: React.ReactElement = (
     <NFTOfferSummaryRow
       title={makerTitle}
@@ -352,20 +352,25 @@ function NFTOfferDetails(props: NFTOfferDetailsProps) {
   const theme = useTheme();
   const [acceptOffer] = useAcceptOfferHook();
   const [isAccepting, setIsAccepting] = useState<boolean>(false);
-  const [isValidating, setIsValidating] = useState<boolean>(false);
+
   const [isValid, setIsValid] = useState<boolean>(tradeRecord !== undefined);
   const [isMissingRequestedAsset, setIsMissingRequestedAsset] = useState<boolean>(false);
-  const [checkOfferValidity] = useCheckOfferValidityMutation();
+  const [checkOfferValidity, { isLoading: isCheckOfferValidityLoading }] = useCheckOfferValidityMutation();
   const driverDict: { [key: string]: any } = summary?.infos ?? {};
   const launcherId: string | undefined = Object.keys(driverDict).find(
     (id: string) => driverDict[id].launcherId?.length > 0
   );
   const nftId: string | undefined = launcherId ? launcherIdToNFTId(launcherId) : undefined;
-  const { data: nft } = useGetNFTInfoQuery({ coinId: launcherId });
+  const { nft } = useNFT(launcherId);
   const { amount, assetId, assetType } = getNFTPriceWithoutRoyalties(summary) ?? {};
   const { lookupByAssetId } = useAssetIdName();
   const assetIdInfo = assetId ? lookupByAssetId(assetId) : undefined;
   const displayName = assetIdInfo?.displayName ?? t`Unknown CAT`;
+
+  const { data: wallets, isLoading: isLoadingWallets } = useGetWalletsQuery();
+  const { offers, isLoading: isOffersLoading } = useWalletOffers(-1, 0, true, false, 'RELEVANCE', false);
+
+  const isLoading = isLoadingWallets || isOffersLoading;
 
   const nftSaleInfo = useMemo(() => {
     if (!exchangeType || amount === undefined || !nft || nft.royaltyPercentage === undefined) {
@@ -402,20 +407,13 @@ function NFTOfferDetails(props: NFTOfferDetailsProps) {
     let valid = false;
 
     try {
-      setIsValidating(true);
+      const response = await checkOfferValidity({ offer: offerData }).unwrap();
 
-      const response = await checkOfferValidity(offerData);
-
-      if (response.data?.success === true) {
-        valid = response.data?.valid === true;
-      } else {
-        showError(response.data?.error ?? new Error('Encountered an unknown error while checking offer validity'));
-      }
+      valid = response.data?.valid === true;
     } catch (e) {
       showError(e);
     } finally {
       setIsValid(valid);
-      setIsValidating(false);
     }
   }, [checkOfferValidity, offerData, showError]);
 
@@ -431,6 +429,8 @@ function NFTOfferDetails(props: NFTOfferDetailsProps) {
       offerData,
       summary,
       fee,
+      wallets,
+      offers,
       (accepting: boolean) => setIsAccepting(accepting),
       () => navigate('/dashboard/offers')
     );
@@ -441,7 +441,7 @@ function NFTOfferDetails(props: NFTOfferDetailsProps) {
       <Flex flexDirection="column" flexGrow={1} gap={4}>
         <OfferHeader
           isMyOffer={isMyOffer}
-          isInvalid={!isValidating && !isValid}
+          isInvalid={!isCheckOfferValidityLoading && !isValid}
           isComplete={tradeRecord?.status === OfferState.CONFIRMED}
         />
 
@@ -632,7 +632,7 @@ function NFTOfferDetails(props: NFTOfferDetailsProps) {
                       variant="contained"
                       color="primary"
                       type="submit"
-                      disabled={!isValid || isMissingRequestedAsset}
+                      disabled={!isValid || isMissingRequestedAsset || isLoading}
                       loading={isAccepting}
                     >
                       <Trans>Accept Offer</Trans>

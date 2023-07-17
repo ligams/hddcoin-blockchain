@@ -6,36 +6,38 @@ import sys
 from setuptools import setup
 
 dependencies = [
-    "aiofiles==22.1.0",  # Async IO for files
+    "aiofiles==23.1.0",  # Async IO for files
+    "anyio==3.6.2",
+    "boto3==1.26.131",  # AWS S3 for DL s3 plugin
     "blspy==1.0.16",  # Signature library
-    "chiavdf==1.0.8",  # timelord and vdf verification
+    "chiavdf==1.0.9",  # timelord and vdf verification
     "chiabip158==1.2",  # bip158-style wallet filters
     "chiapos==1.0.11",  # proof of space
     "clvm==0.9.7",
     "clvm_tools==0.4.6",  # Currying, Program.to, other conveniences
-    "chia_rs==0.2.0",
+    "chia_rs==0.2.7",
     "clvm-tools-rs==0.1.30",  # Rust implementation of clvm_tools' compiler
-    "aiohttp==3.8.3",  # HTTP server for full node rpc
-    "aiosqlite==0.17.0",  # asyncio wrapper for sqlite, to store blocks
-    "bitstring==3.1.9",  # Binary data management library
-    "colorama==0.4.5",  # Colorizes terminal output
+    "aiohttp==3.8.4",  # HTTP server for full node rpc
+    "aiosqlite==0.19.0",  # asyncio wrapper for sqlite, to store blocks
+    "bitstring==4.0.2",  # Binary data management library
+    "colorama==0.4.6",  # Colorizes terminal output
     "colorlog==6.7.0",  # Adds color to logs
-    "concurrent-log-handler==0.9.20",  # Concurrently log and rotate logs
-    "cryptography==38.0.3",  # Python cryptography library for TLS - keyring conflict
-    "filelock==3.8.0",  # For reading and writing config multiprocess and multithread safely  (non-reentrant locks)
-    "keyring==23.9.3",  # Store keys in MacOS Keychain, Windows Credential Locker
+    "concurrent-log-handler==0.9.24",  # Concurrently log and rotate logs
+    "cryptography==40.0.2",  # Python cryptography library for TLS - keyring conflict
+    "filelock==3.12.0",  # For reading and writing config multiprocess and multithread safely  (non-reentrant locks)
+    "keyring==23.13.1",  # Store keys in MacOS Keychain, Windows Credential Locker
     "PyYAML==6.0",  # Used for config file format
-    "setproctitle==1.2.3",  # Gives the hddcoin processes readable names
+    "setproctitle==1.3.2",  # Gives the hddcoin processes readable names
     "sortedcontainers==2.4.0",  # For maintaining sorted mempools
     "click==8.1.3",  # For the CLI
     "click-params==0.4.0",  # For HDDcoin HODL
     "distro==1.8.0",  # For HDDcoin HODL
-    "dnspython==2.2.1",  # Query DNS seeds
+    "dnspython==2.3.0",  # Query DNS seeds
     "watchdog==2.2.0",  # Filesystem event watching - watches keyring.yaml
     "dnslib==0.9.23",  # dns lib
-    "typing-extensions==4.4.0",  # typing backports like Protocol and TypedDict
-    "zstd==1.5.2.6",
-    "packaging==21.3",
+    "typing-extensions==4.6.0",  # typing backports like Protocol and TypedDict
+    "zstd==1.5.5.1",
+    "packaging==23.1",
     "psutil==5.9.4",
 ]
 
@@ -44,9 +46,9 @@ upnp_dependencies = [
 ]
 
 dev_dependencies = [
-    "anyio",
     "build",
-    "coverage",
+    # >=7.2.4 for https://github.com/nedbat/coveragepy/issues/1604
+    "coverage>=7.2.4",
     "diff-cover",
     "pre-commit",
     "py3createtorrent",
@@ -59,12 +61,11 @@ dev_dependencies = [
     "twine",
     "isort",
     "flake8",
-    # TODO: remove this pin after fixing the new complaints
-    "mypy<1",
-    "black==22.10.0",
+    "mypy==1.3.0",
+    "black==23.3.0",
     "aiohttp_cors",  # For blackd
     "ipython",  # For asyncio debugging
-    "pyinstaller==5.6.2",
+    "pyinstaller==5.11.0",
     "types-aiofiles",
     "types-cryptography",
     "types-pkg_resources",
@@ -124,9 +125,11 @@ kwargs = dict(
         "hddcoin.wallet.cat_wallet",
         "hddcoin.wallet.did_wallet",
         "hddcoin.wallet.nft_wallet",
-        "hddcoin.wallet.settings",
         "hddcoin.wallet.trading",
         "hddcoin.wallet.util",
+        "hddcoin.wallet.vc_wallet",
+        "hddcoin.wallet.vc_wallet.vc_puzzles",
+        "hddcoin.wallet.vc_wallet.cr_puzzles",
         "hddcoin.ssl",
         "mozilla-ca",
     ],
@@ -146,11 +149,12 @@ kwargs = dict(
             "hddcoin_full_node_simulator = hddcoin.simulator.start_simulator:main",
             "hddcoin_data_layer = hddcoin.server.start_data_layer:main",
             "hddcoin_data_layer_http = hddcoin.data_layer.data_layer_server:main",
+            "hddcoin_data_layer_s3_plugin = hddcoin.data_layer.s3_plugin_service:run_server",
         ]
     },
     package_data={
         "hddcoin": ["pyinstaller.spec"],
-        "": ["*.clvm", "*.clvm.hex", "*.clib", "*.clinc", "*.clsp", "py.typed"],
+        "": ["*.clsp", "*.clsp.hex", "*.clvm", "*.clib", "py.typed"],
         "hddcoin.util": ["initial-*.yaml", "english.txt"],
         "hddcoin.ssl": ["hddcoin_ca.crt", "hddcoin_ca.key", "dst_root_ca.pem"],
         "mozilla-ca": ["cacert.pem"],

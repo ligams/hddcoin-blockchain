@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from typing_extensions import Protocol
 
-from hddcoin.types.blockchain_format.program import SerializedProgram
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.util.ints import uint32
 

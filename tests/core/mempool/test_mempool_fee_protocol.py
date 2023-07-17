@@ -6,7 +6,7 @@ from typing import List, Tuple, Union
 import pytest
 
 from hddcoin.full_node.full_node_api import FullNodeAPI
-from hddcoin.protocols import full_node_protocol, wallet_protocol
+from hddcoin.protocols import wallet_protocol
 from hddcoin.protocols.protocol_message_types import ProtocolMessageTypes
 from hddcoin.protocols.wallet_protocol import RespondFeeEstimates
 from hddcoin.server.server import HDDcoinServer
@@ -20,11 +20,11 @@ from tests.core.node_height import node_height_at_least
 
 @pytest.mark.asyncio
 async def test_protocol_messages(
-    wallet_node_sim_and_wallet: Tuple[
+    simulator_and_wallet: Tuple[
         List[Union[FullNodeAPI, FullNodeSimulator]], List[Tuple[Wallet, HDDcoinServer]], BlockTools
     ]
 ) -> None:
-    full_nodes, wallets, bt = wallet_node_sim_and_wallet
+    full_nodes, wallets, bt = simulator_and_wallet
     a_wallet = bt.get_pool_wallet_tool()
     reward_ph = a_wallet.get_new_puzzlehash()
     blocks = bt.get_consecutive_blocks(
@@ -37,7 +37,7 @@ async def test_protocol_messages(
     full_node_sim: Union[FullNodeAPI, FullNodeSimulator] = full_nodes[0]
 
     for block in blocks:
-        await full_node_sim.full_node.respond_block(full_node_protocol.RespondBlock(block))
+        await full_node_sim.full_node.add_block(block)
 
     await time_out_assert(60, node_height_at_least, True, full_node_sim, blocks[-1].height)
 

@@ -3,26 +3,26 @@ import {
   CopyToClipboard,
   EstimatedFee,
   Fee,
+  FeeTxType,
   Flex,
   FormatLargeNumber,
   Link,
   Loading,
   StateColor,
-  TextField,
   Tooltip,
   TooltipIcon,
 } from '@hddcoin-network/core';
 import { Trans } from '@lingui/macro';
 import { Remove } from '@mui/icons-material';
 import { Box, Typography, IconButton } from '@mui/material';
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { useWatch } from 'react-hook-form';
 
 import useOfferBuilderContext from '../../hooks/useOfferBuilderContext';
+import NFTAutocomplete from '../nfts/NFTAutocomplete';
 import OfferBuilderAmountWithRoyalties from './OfferBuilderAmountWithRoyalties';
 import OfferBuilderRoyaltyPayouts from './OfferBuilderRoyaltyPayouts';
 import OfferBuilderTokenSelector from './OfferBuilderTokenSelector';
-import OfferBuilderValueSearch from './OfferBuilderValueSearch';
 
 export type OfferBuilderValueProps = {
   name: string;
@@ -35,7 +35,6 @@ export type OfferBuilderValueProps = {
   showAmountInBytes?: boolean;
   usedAssets?: string[];
   disableReadOnly?: boolean;
-  onSelectNFT: (nftId: string) => void;
   warnUnknownCAT?: boolean;
   amountWithRoyalties?: string;
   royaltyPayments?: Record<string, any>[];
@@ -53,7 +52,6 @@ export default function OfferBuilderValue(props: OfferBuilderValueProps) {
     showAmountInBytes,
     usedAssets,
     disableReadOnly = false,
-    onSelectNFT,
     warnUnknownCAT = false,
     amountWithRoyalties,
     royaltyPayments,
@@ -101,7 +99,7 @@ export default function OfferBuilderValue(props: OfferBuilderValueProps) {
                       {type === 'token' /* ? (
                         <Link href={`https://www.taildatabase.com/tail/${value.toLowerCase()}`} target="_blank">
                           <Trans>Search on Tail Database</Trans>
-                        </Link> 
+                        </Link>
                       ) : null */ }
                     </Flex>
                     <CopyToClipboard value={displayValue} fontSize="small" invertColor />
@@ -149,7 +147,7 @@ export default function OfferBuilderValue(props: OfferBuilderValueProps) {
             ) : type === 'fee' ? (
               builderReadOnly ? (
                 <EstimatedFee
-                  txType="acceptOffer"
+                  txType={FeeTxType.acceptOffer}
                   variant="filled"
                   color="secondary"
                   label={label}
@@ -160,10 +158,7 @@ export default function OfferBuilderValue(props: OfferBuilderValueProps) {
                 <Fee variant="filled" color="secondary" label={label} name={name} fullWidth />
               )
             ) : type === 'text' ? (
-              <>
-                <TextField variant="filled" color="secondary" label={label} name={name} required fullWidth />
-                <OfferBuilderValueSearch value={value} onSelectNFT={onSelectNFT} />
-              </>
+              <NFTAutocomplete variant="filled" color="secondary" label={label} name={name} required fullWidth />
             ) : type === 'token' ? (
               <OfferBuilderTokenSelector
                 variant="filled"
@@ -192,7 +187,7 @@ export default function OfferBuilderValue(props: OfferBuilderValueProps) {
       {warnUnknownCAT && (
         <Flex gap={0.5} alignItems="center">
           <Typography variant="body2" color={StateColor.WARNING}>
-            Unknown CAT
+            Unknown HAT
           </Typography>
           <TooltipIcon>
             {offeredUnknownCATs?.includes(value) ? (
@@ -202,7 +197,7 @@ export default function OfferBuilderValue(props: OfferBuilderValueProps) {
             ) : requestedUnknownCATs?.includes(value) ? (
               <Typography variant="caption" color="textSecondary">
                 <Trans>
-                  Warning: Verify that the offered CAT asset IDs match the asset IDs of the tokens you expect to
+                  Warning: Verify that the offered HAT asset IDs match the asset IDs of the tokens you expect to
                   receive.
                 </Trans>
               </Typography>

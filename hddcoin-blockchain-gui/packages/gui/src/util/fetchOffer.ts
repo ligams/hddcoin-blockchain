@@ -1,14 +1,18 @@
 import { store, walletApi } from '@hddcoin-network/api-react';
-import isURL from 'validator/lib/isURL';
+import { isValidURL } from '@hddcoin-network/core';
 
 import OfferServices from '../constants/OfferServices';
-import getRemoteFileContent from './getRemoteFileContent';
 import offerToOfferBuilderData from './offerToOfferBuilderData';
+import parseFileContent from './parseFileContent';
 
-const cache: Record<string, string> = {};
+type FetchOfferParams = {
+  offerUrl: string;
+  getContent: (url: string, options?: { maxSize?: number; timeout?: number }) => Promise<Buffer>;
+  getHeaders: (url: string, options?: { maxSize?: number; timeout?: number }) => Promise<Object>;
+};
 
-export default async function fetchOffer(offerUrl: string) {
-  if (!offerUrl || !isURL(offerUrl)) {
+export default async function fetchOffer({ offerUrl, getContent, getHeaders }: FetchOfferParams) {
+  if (!offerUrl || !isValidURL(offerUrl)) {
     throw new Error(`URL is not valid: ${offerUrl}`);
   }
 
@@ -18,25 +22,22 @@ export default async function fetchOffer(offerUrl: string) {
     throw new Error('Service not found');
   }
 
-  if (!cache[offerUrl]) {
-    const { data } = await getRemoteFileContent({
-      uri: offerUrl,
-      maxSize: 10 * 1024 * 1024, // 10 MB
-      nftId: offerUrl,
-      dataHash: 'no hash',
-    });
+  const headers = await getHeaders(offerUrl, {
+    maxSize: 10 * 1024 * 1024, // 10 MB
+  });
 
-    cache[offerUrl] = data;
-  }
+  const content = await getContent(offerUrl, {
+    maxSize: 10 * 1024 * 1024, // 10 MB
+  });
 
-  const offerData = cache[offerUrl];
+  const offerData = parseFileContent(content, headers);
 
   if (!offerData) {
     throw new Error('Failed to get offer data');
   }
 
   // fetch offer summary
-  const resultOfferSummaryPromise = store.dispatch(walletApi.endpoints.getOfferSummary.initiate(offerData));
+  const resultOfferSummaryPromise = store.dispatch(walletApi.endpoints.getOfferSummary.initiate({ offerData }));
   const { data: dataOfferSummary, error: errorOfferSummary } = await resultOfferSummaryPromise;
   if (errorOfferSummary) {
     throw errorOfferSummary;
@@ -49,7 +50,9 @@ export default async function fetchOffer(offerUrl: string) {
   }
 
   // check offer validity
-  const resultOfferValidityPromise = store.dispatch(walletApi.endpoints.checkOfferValidity.initiate(offerData));
+  const resultOfferValidityPromise = store.dispatch(
+    walletApi.endpoints.checkOfferValidity.initiate({ offer: offerData })
+  );
   const { data: dataOfferValidity, error: errorOfferValidity } = await resultOfferValidityPromise;
   if (errorOfferValidity) {
     throw errorOfferValidity;
@@ -61,7 +64,7 @@ export default async function fetchOffer(offerUrl: string) {
     throw new Error('Failed to check offer validity');
   }
 
-  const offer = offerToOfferBuilderData(offerSummary);
+  const offer = offerToOfferBuilderData(offerSummary, true);
 
   /*
   // get trade record

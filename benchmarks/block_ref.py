@@ -15,7 +15,7 @@ from hddcoin.consensus.blockchain import Blockchain
 from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.full_node.block_store import BlockStore
 from hddcoin.full_node.coin_store import CoinStore
-from hddcoin.types.blockchain_format.program import SerializedProgram
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.util.db_version import lookup_db_version
 from hddcoin.util.db_wrapper import DBWrapper2
@@ -48,8 +48,7 @@ def random_refs() -> List[uint32]:
 REPETITIONS = 100
 
 
-async def main(db_path: Path):
-
+async def main(db_path: Path) -> None:
     random.seed(0x213FB154)
 
     async with aiosqlite.connect(db_path) as connection:
@@ -92,7 +91,7 @@ async def main(db_path: Path):
 
 @click.command()
 @click.argument("db-path", type=click.Path())
-def entry_point(db_path: Path):
+def entry_point(db_path: Path) -> None:
     asyncio.run(main(Path(db_path)))
 
 

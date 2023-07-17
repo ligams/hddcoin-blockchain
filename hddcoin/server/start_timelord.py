@@ -12,11 +12,10 @@ from hddcoin.server.outbound_message import NodeType
 from hddcoin.server.start_service import RpcInfo, Service, async_run
 from hddcoin.timelord.timelord import Timelord
 from hddcoin.timelord.timelord_api import TimelordAPI
-from hddcoin.types.peer_info import PeerInfo
+from hddcoin.types.peer_info import UnresolvedPeerInfo
 from hddcoin.util.hddcoin_logging import initialize_service_logging
 from hddcoin.util.config import load_config, load_config_cli
 from hddcoin.util.default_root import DEFAULT_ROOT_PATH
-from hddcoin.util.network import get_host_addr
 
 # See: https://bugs.python.org/issue29288
 "".encode("idna")
@@ -35,9 +34,9 @@ def create_timelord_service(
 ) -> Service[Timelord]:
     service_config = config[SERVICE_NAME]
 
-    connect_peers = [
-        PeerInfo(str(get_host_addr(service_config["full_node_peer"]["host"])), service_config["full_node_peer"]["port"])
-    ]
+    connect_peers = {
+        UnresolvedPeerInfo(service_config["full_node_peer"]["host"], service_config["full_node_peer"]["port"])
+    }
     overrides = service_config["network_overrides"]["constants"][service_config["selected_network"]]
     updated_constants = constants.replace_str_to_bytes(**overrides)
 
@@ -57,11 +56,11 @@ def create_timelord_service(
         node_type=NodeType.TIMELORD,
         advertised_port=service_config["port"],
         service_name=SERVICE_NAME,
-        server_listen_ports=[service_config["port"]],
         connect_peers=connect_peers,
         network_id=network_id,
         rpc_info=rpc_info,
         connect_to_daemon=connect_to_daemon,
+        listen=False,
     )
 
 

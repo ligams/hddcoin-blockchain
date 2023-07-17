@@ -1,4 +1,4 @@
-import { OfferSummaryRecord } from '@hddcoin-network/api';
+import type { OfferSummaryRecord, Wallet } from '@hddcoin-network/api';
 import { useTakeOfferMutation } from '@hddcoin-network/api-react';
 import { AlertDialog, hddcoinToByte, useOpenDialog, useShowError } from '@hddcoin-network/core';
 import { Trans, t } from '@lingui/macro';
@@ -8,12 +8,18 @@ import React from 'react';
 import OfferAcceptConfirmationDialog from '../components/offers/OfferAcceptConfirmationDialog';
 import OfferAsset from '../components/offers/OfferAsset';
 import { offerAssetTypeForAssetId } from '../components/offers/utils';
+import OfferEditorConflictAlertDialog from '../components/offers2/OfferEditorCancelConflictingOffersDialog';
+import offerBuilderDataToOffer from '../util/offerBuilderDataToOffer';
+import offerToOfferBuilderData from '../util/offerToOfferBuilderData';
 import useAssetIdName from './useAssetIdName';
+import { OfferTradeRecordFormatted } from './useWalletOffers';
 
 export type AcceptOfferHook = (
   offerData: string,
   offerSummary: OfferSummaryRecord,
   fee: string | undefined,
+  wallets: Wallet[],
+  offers: OfferTradeRecordFormatted[],
   onUpdate: (accepting: boolean) => void,
   onSuccess: () => void
 ) => Promise<void>;
@@ -28,9 +34,47 @@ export default function useAcceptOfferHook(): [AcceptOfferHook] {
     offerData: string,
     offerSummary: OfferSummaryRecord,
     fee: string | undefined,
+    wallets: Wallet[],
+    offers: OfferTradeRecordFormatted[],
     onUpdate?: (accepting: boolean) => void,
     onSuccess?: () => void
   ): Promise<void> {
+    const offerBuilderData = offerToOfferBuilderData(offerSummary, true);
+    const { assetsToUnlock } = await offerBuilderDataToOffer({
+      data: offerBuilderData,
+      wallets,
+      offers: offers || [],
+      validateOnly: false,
+      considerNftRoyalty: true,
+      allowEmptyOfferColumn: true, // When accepting a one-sided offer, nothing is required in the offer column
+      allowUnknownRequestedCATs: true, // When accepting an offer containing unknown CATs, we can still accept it
+    });
+
+    const assetsRequiredToBeUnlocked = [];
+    const assetsBetterToBeUnlocked = [];
+    for (let i = 0; i < assetsToUnlock.length; i++) {
+      const atu = assetsToUnlock[i];
+      if (atu.status === 'conflictsWithNewOffer') {
+        assetsRequiredToBeUnlocked.push(atu);
+      } else if (atu.status === 'alsoUsedInNewOfferWithoutConflict') {
+        assetsBetterToBeUnlocked.push(atu);
+      }
+    }
+
+    if (assetsRequiredToBeUnlocked.length + assetsBetterToBeUnlocked.length > 0) {
+      const dialog = (
+        <OfferEditorConflictAlertDialog
+          assetsToUnlock={assetsRequiredToBeUnlocked}
+          // assetsBetterUnlocked={assetsBetterToBeUnlocked}
+          assetsBetterUnlocked={[]} // Ignoring assetsBetterToBeUnlocked to avoid displaying the dialog unnecessarily
+        />
+      );
+      const confirmedToProceed = await openDialog(dialog);
+      if (!confirmedToProceed) {
+        return;
+      }
+    }
+
     const feeInBytes: BigNumber = fee ? hddcoinToByte(fee) : new BigNumber(0);
     const offeredUnknownCATs: string[] = Object.entries(offerSummary.offered)
       .filter(
@@ -47,17 +91,13 @@ export default function useAcceptOfferHook(): [AcceptOfferHook] {
     try {
       onUpdate?.(true);
 
-      const response = await takeOffer({ offer: offerData, fee: feeInBytes });
+      const response = await takeOffer({ offer: offerData, fee: feeInBytes }).unwrap();
 
-      if (response.data?.success === true) {
-        await openDialog(
-          <AlertDialog title={<Trans>Success</Trans>}>
-            {response.message ?? <Trans>Offer has been accepted and is awaiting confirmation.</Trans>}
-          </AlertDialog>
-        );
-      } else {
-        throw new Error(response.error?.message ?? 'Something went wrong');
-      }
+      await openDialog(
+        <AlertDialog title={<Trans>Success</Trans>}>
+          {response.message ?? <Trans>Offer has been accepted and is awaiting confirmation.</Trans>}
+        </AlertDialog>
+      );
 
       onSuccess?.();
     } catch (e) {

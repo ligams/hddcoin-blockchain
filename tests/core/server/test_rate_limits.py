@@ -13,12 +13,10 @@ from hddcoin.server.rate_limit_numbers import rate_limits as rl_numbers
 from hddcoin.server.rate_limits import RateLimiter
 from hddcoin.server.server import HDDcoinServer
 from hddcoin.server.ws_connection import WSHDDcoinConnection
-from hddcoin.simulator.block_tools import test_constants
 from hddcoin.types.peer_info import PeerInfo
 from hddcoin.util.ints import uint16
 from tests.conftest import node_with_params
 
-constants = test_constants
 rl_v2 = [Capability.BASE, Capability.BLOCK_HEADERS, Capability.RATE_LIMITS_V2]
 rl_v1 = [Capability.BASE]
 node_with_params_b = node_with_params

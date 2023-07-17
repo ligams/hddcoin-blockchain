@@ -1,68 +1,115 @@
 import type { KeyData } from '@hddcoin-network/api';
 import {
+  usePrefs,
   useGetKeyringStatusQuery,
   useDeleteAllKeysMutation,
-  useLogInAndSkipImportMutation,
   useGetKeysQuery,
-  useLogout,
+  type Serializable,
 } from '@hddcoin-network/api-react';
+import { HDDcoinBlack, Coins } from '@hddcoin-network/icons';
 import { Trans } from '@lingui/macro';
-import { Alert, Typography, Container } from '@mui/material';
+import { Delete as DeleteIcon } from '@mui/icons-material';
+import { Alert, Typography, Container, ListItemIcon } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
+import Sortable from 'sortablejs';
 import styled from 'styled-components';
 
 import Button from '../../components/Button';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import DropdownActions from '../../components/Dropdown/DropdownActions';
 import Flex from '../../components/Flex';
 import Loading from '../../components/Loading';
-import Logo from '../../components/Logo';
+import MenuItem from '../../components/MenuItem/MenuItem';
+import More from '../../components/More';
 import TooltipIcon from '../../components/TooltipIcon';
+import useAuth from '../../hooks/useAuth';
 import useKeyringMigrationPrompt from '../../hooks/useKeyringMigrationPrompt';
 import useOpenDialog from '../../hooks/useOpenDialog';
 import useShowError from '../../hooks/useShowError';
 import useSkipMigration from '../../hooks/useSkipMigration';
+import { randomEmoji } from './EmojiAndColorPicker';
+// import Search from './Search';
 import SelectKeyItem from './SelectKeyItem';
 
 const StyledContainer = styled(Container)`
   padding-bottom: 1rem;
+  max-width: 968px;
 `;
 
 export default function SelectKey() {
   const openDialog = useOpenDialog();
   const navigate = useNavigate();
   const [deleteAllKeys] = useDeleteAllKeysMutation();
-  const [logIn, { isLoading: isLoadingLogIn }] = useLogInAndSkipImportMutation();
-  const { data: publicKeyFingerprints, isLoading: isLoadingPublicKeys, error, refetch } = useGetKeysQuery();
+
+  const { isLoading: isLoggingIn, logIn } = useAuth();
+  const [selectedKey, setSelectedKey] = useState<number | null>(null);
+  const { data: publicKeyFingerprints, isLoading: isLoadingPublicKeys, error, refetch } = useGetKeysQuery({});
   const { data: keyringState, isLoading: isLoadingKeyringStatus } = useGetKeyringStatusQuery();
   const hasFingerprints = !!publicKeyFingerprints?.length;
-  const [selectedFingerprint, setSelectedFingerprint] = useState<number | undefined>();
-
   const [skippedMigration] = useSkipMigration();
   const [promptForKeyringMigration] = useKeyringMigrationPrompt();
   const showError = useShowError();
-  const cleanCache = useLogout();
+  const [sortedWallets, setSortedWallets] = usePrefs('sortedWallets', []);
 
-  const isLoading = isLoadingPublicKeys || isLoadingLogIn;
+  const keyItemsSortable = React.useRef<any>(null);
 
-  async function handleSelect(fingerprint: number) {
-    if (selectedFingerprint) {
-      return;
+  React.useEffect(() => {
+    if (document.getElementById('key-items-container')) {
+      keyItemsSortable.current = new Sortable(document.getElementById('key-items-container'), {
+        onEnd: () => {
+          const newArray = [...(document.getElementById('key-items-container') as HTMLElement).children]
+            .filter((node: any) => node.hasAttribute('data-testid'))
+            .map((node: any) => node.attributes['data-testid'].value.split('-')[2]);
+          setSortedWallets(newArray);
+        },
+      });
     }
+  }, [publicKeyFingerprints, setSortedWallets]);
 
+  type LocalStorageType = Record<string, Record<string, Serializable>>;
+  const theme = useTheme();
+  const [fingerprintSettings, setFingerprintSettings] = usePrefs<LocalStorageType>('fingerprintSettings', {});
+  const allColors = (theme.palette as any).colors;
+  /* useEffect - set random emojis and colors for each wallet
+     if we got no walletKeyTheme keys in each fingerprint inside prefs.yaml */
+  React.useEffect(() => {
+    if (publicKeyFingerprints?.length) {
+      const newFingerprints: any = {};
+      let notifyChange: boolean = false;
+      publicKeyFingerprints.forEach((f: any) => {
+        const themeColors = Object.keys(allColors);
+        const randomTheme = {
+          emoji: randomEmoji(),
+          color: themeColors[Math.floor(themeColors.length * Math.random())],
+        };
+        if (fingerprintSettings[f.fingerprint] && !fingerprintSettings[f.fingerprint].walletKeyTheme) {
+          newFingerprints[f.fingerprint] = { ...fingerprintSettings[f.fingerprint], walletKeyTheme: randomTheme };
+          notifyChange = true;
+        } else if (!fingerprintSettings[f.fingerprint]) {
+          newFingerprints[f.fingerprint] = { walletKeyTheme: randomTheme };
+          notifyChange = true;
+        } else {
+          newFingerprints[f.fingerprint] = fingerprintSettings[f.fingerprint];
+        }
+      });
+      if (notifyChange) {
+        setFingerprintSettings(newFingerprints);
+      }
+    }
+  }, [publicKeyFingerprints, fingerprintSettings, setFingerprintSettings, allColors]);
+
+  async function handleSelect(logInFingerprint: number) {
     try {
-      setSelectedFingerprint(fingerprint);
-      await logIn({
-        fingerprint,
-      }).unwrap();
-
-      await cleanCache();
+      setSelectedKey(logInFingerprint);
+      await logIn(logInFingerprint);
 
       navigate('/dashboard/wallets');
     } catch (err) {
-      showError(err);
+      showError(err as Error);
     } finally {
-      setSelectedFingerprint(undefined);
+      setSelectedKey(null);
     }
   }
 
@@ -108,13 +155,81 @@ export default function SelectKey() {
     }
   }
 
+  function sortedFingerprints(fingerprints: string[]) {
+    const sorted = sortedWallets
+      .map((value: string) => fingerprints.find((f: any) => value === String(f.fingerprint)))
+      .filter((x: any) => !!x); /* if we added a new wallet and order was not saved yet case */
+    fingerprints.forEach((f: any) => {
+      if (sorted.map((f2: any) => f2.fingerprint).indexOf(f.fingerprint) === -1) {
+        sorted.push(f);
+      }
+    });
+    return sorted;
+  }
+
+  const NewWalletButtonGroup = (
+    <Flex alignItems="right">
+      <DropdownActions label={<Trans>Add wallet</Trans>} variant="contained">
+        <MenuItem close onClick={() => handleNavigationIfKeyringIsMutable('/wallet/add')}>
+          <Typography variant="inherit" noWrap>
+            <Trans>Create New</Trans>
+          </Typography>
+        </MenuItem>
+        <MenuItem close onClick={() => handleNavigationIfKeyringIsMutable('/wallet/import')}>
+          <Typography variant="inherit" noWrap>
+            <Trans>Import Existing</Trans>
+          </Typography>
+        </MenuItem>
+      </DropdownActions>
+      {hasFingerprints && (
+        <Flex
+          sx={{
+            '> button': {
+              width: '37px',
+              height: '37px',
+              marginLeft: '10px',
+            },
+          }}
+        >
+          <More>
+            <MenuItem onClick={handleDeleteAllKeys} close>
+              <ListItemIcon>
+                <DeleteIcon />
+              </ListItemIcon>
+              <Typography variant="inherit" noWrap>
+                <Trans>Delete All Keys</Trans>
+              </Typography>
+            </MenuItem>
+          </More>
+        </Flex>
+      )}
+    </Flex>
+  );
+
+  function renderTopSection() {
+    return (
+      <Flex
+        justifyContent="space-between"
+        width="100%"
+        sx={{ borderBottom: '1px solid #CCDDE1', paddingBottom: '30px' }}
+      >
+        <Flex alignItems="left">
+          <HDDcoinBlack color="secondary" />
+          <Typography variant="h4" component="h1" sx={{ position: 'relative', left: '15px', top: '5px' }}>
+            <Trans>Wallet Keys</Trans>
+          </Typography>
+        </Flex>
+        {NewWalletButtonGroup}
+      </Flex>
+    );
+  }
+
   return (
-    <StyledContainer maxWidth="xs">
+    <StyledContainer>
       <Flex flexDirection="column" alignItems="center" gap={3}>
-        <Logo width={130} />
         {isLoadingPublicKeys ? (
           <Loading center>
-            <Trans>Loading list of the keys</Trans>
+            <Trans>Loading keys</Trans>
           </Loading>
         ) : error ? (
           <Alert
@@ -125,72 +240,80 @@ export default function SelectKey() {
               </Button>
             }
           >
-            <Trans>Unable to load the list of the keys</Trans>
+            <Trans>Unable to load keys</Trans>
             &nbsp;
             <TooltipIcon>{error.message}</TooltipIcon>
           </Alert>
         ) : hasFingerprints ? (
-          <Typography variant="h5" component="h1">
-            <Trans>Select Key</Trans>
-          </Typography>
+          <>{renderTopSection()}</>
         ) : (
           <>
-            <Typography variant="h5" component="h1">
-              <Trans>Sign In</Trans>
-            </Typography>
-            <Typography variant="subtitle1" align="center">
-              <Trans>Welcome to HDDcoin. Please log in with an existing key, or create a new key.</Trans>
-            </Typography>
+            {renderTopSection()}
+            <Flex alignItems="center" flexDirection="column">
+              <Typography component="div" variant="h4" color="textPrimary" sx={{ fontWeight: 600, fontSize: '40px' }}>
+                <Trans>Open a world of possibilities.</Trans>
+              </Typography>
+              <Typography
+                component="div"
+                variant="subtitle2"
+                color="textSecondary"
+                sx={{ fontWeight: 400, fontSize: '18px' }}
+              >
+                <Trans>Create a new wallet key to get started with HDDcoin.</Trans>
+              </Typography>
+              <Button
+                onClick={() => handleNavigationIfKeyringIsMutable('/wallet/add')}
+                variant="outlined"
+                color="primary"
+                sx={{ margin: '15px 0' }}
+              >
+                <Trans>Create a new wallet key</Trans>
+              </Button>
+              <Coins />
+            </Flex>
           </>
         )}
+        {/* <Search /> */}
         <Flex flexDirection="column" gap={3} alignItems="stretch" alignSelf="stretch">
           {hasFingerprints && (
-            <Flex gap={2} flexDirection="column" width="100%">
-              {publicKeyFingerprints.map((keyData: KeyData, index: number) => (
+            <Flex
+              id="key-items-container"
+              sx={{
+                marginTop: '5px',
+                flexWrap: 'wrap',
+                rowGap: '22px',
+                columnGap: '22px',
+                paddingBottom: '230px',
+                '> div': {
+                  '@media (min-width: 983px)': {
+                    flexBasis: '292px',
+                    maxWidth: '292px',
+                  },
+                  '@media (max-width: 982px) and (min-width: 569px)': {
+                    flexBasis: 'none',
+                    flex: 'calc(50% - 22px)',
+                    minWidth: '250px',
+                    maxWidth: 'calc(50vw - 42px);',
+                  },
+                  '@media (max-width: 568px)': {
+                    flexBasis: 'none',
+                    minWidth: '250px',
+                  },
+                },
+              }}
+            >
+              {sortedFingerprints(publicKeyFingerprints).map((keyData: KeyData, index: number) => (
                 <SelectKeyItem
                   key={keyData.fingerprint}
                   index={index}
                   keyData={keyData}
                   onSelect={handleSelect}
-                  loading={keyData.fingerprint === selectedFingerprint}
-                  disabled={!!selectedFingerprint && keyData.fingerprint !== selectedFingerprint}
+                  loading={isLoggingIn && keyData.fingerprint === selectedKey}
+                  disabled={isLoggingIn}
                 />
               ))}
             </Flex>
           )}
-          <Button
-            onClick={() => handleNavigationIfKeyringIsMutable('/wallet/add')}
-            variant="contained"
-            color="primary"
-            size="large"
-            disabled={isLoading}
-            data-testid="SelectKey-create-new-key"
-            fullWidth
-          >
-            <Trans>Create a new private key</Trans>
-          </Button>
-          <Button
-            onClick={() => handleNavigationIfKeyringIsMutable('/wallet/import')}
-            type="submit"
-            variant="outlined"
-            size="large"
-            disabled={isLoading}
-            data-testid="SelectKey-import-from-mnemonics"
-            fullWidth
-          >
-            <Trans>Import from Mnemonics (12 or 24 words)</Trans>
-          </Button>
-          <Button
-            onClick={handleDeleteAllKeys}
-            variant="outlined"
-            color="danger"
-            size="large"
-            disabled={isLoading}
-            data-testid="SelectKey-delete-all-keys"
-            fullWidth
-          >
-            <Trans>Delete all keys</Trans>
-          </Button>
         </Flex>
       </Flex>
     </StyledContainer>
