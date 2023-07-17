@@ -86,8 +86,7 @@ You can install HDDcoin by building from source, or by using the latest binaries
 # Install and run the GUI:
 
    sh install-gui.sh
-   cd hddcoin-blockchain-gui
-   npm run electron &
+   bash start-gui.sh &
 ```
 
 If the client does not find any connections automatically, you can add any of the following:
