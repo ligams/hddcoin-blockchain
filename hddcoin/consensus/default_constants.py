@@ -56,9 +56,9 @@ default_kwargs = {
     "MAX_GENERATOR_SIZE": 1000000,
     "MAX_GENERATOR_REF_LIST_SIZE": 512,  # Number of references allowed in the block generator ref list
     "POOL_SUB_SLOT_ITERS": 37600000000,  # iters limit * NUM_SPS
-    "SOFT_FORK2_HEIGHT": 3550000,
+    "SOFT_FORK2_HEIGHT": 3700000,
     # September 2023
-    "SOFT_FORK3_HEIGHT": 3700000,
+    "SOFT_FORK3_HEIGHT": 3750000,
     # June 2024
     "HARD_FORK_HEIGHT": 4996000,
     # June 2027
