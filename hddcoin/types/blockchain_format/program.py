@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
-from chia_rs import ALLOW_BACKREFS, run_hddcoin_program, tree_hash
+from chia_rs import ALLOW_BACKREFS, run_chia_program, tree_hash
 from clvm import SExp
 from clvm.casts import int_from_bytes
 from clvm.EvalError import EvalError
@@ -36,7 +36,7 @@ class Program(SExp):
         # the first argument is the buffer we want to parse. This effectively
         # leverages the rust parser and LazyNode, making it a lot faster to
         # parse serialized programs into a python compatible structure
-        cost, ret = run_hddcoin_program(
+        cost, ret = run_chia_program(
             b"\x01",
             blob,
             50,
@@ -110,7 +110,7 @@ class Program(SExp):
 
     def _run(self, max_cost: int, flags: int, args: object) -> Tuple[int, Program]:
         prog_args = Program.to(args)
-        cost, r = run_hddcoin_program(self.as_bin(), prog_args.as_bin(), max_cost, flags)
+        cost, r = run_chia_program(self.as_bin(), prog_args.as_bin(), max_cost, flags)
         return cost, Program.to(r)
 
     def run_with_cost(self, max_cost: int, args: object) -> Tuple[int, Program]:

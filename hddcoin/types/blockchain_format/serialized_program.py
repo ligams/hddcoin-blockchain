@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from typing import Tuple
 
-from chia_rs import MEMPOOL_MODE, run_hddcoin_program, serialized_length, tree_hash
+from chia_rs import MEMPOOL_MODE, run_chia_program, serialized_length, tree_hash
 from clvm import SExp
 from clvm.SExp import CastableType
 
@@ -106,7 +106,7 @@ class SerializedProgram:
         # serialize them back again. This is handled by _serialize()
         serialized_args = _serialize(arg)
 
-        cost, ret = run_hddcoin_program(
+        cost, ret = run_chia_program(
             self._buf,
             bytes(serialized_args),
             max_cost,

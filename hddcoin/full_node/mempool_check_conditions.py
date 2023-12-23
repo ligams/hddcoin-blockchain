@@ -13,7 +13,7 @@ from chia_rs import (
     NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
 )
 from chia_rs import get_puzzle_and_solution_for_coin as get_puzzle_and_solution_for_coin_rust
-from chia_rs import run_block_generator, run_block_generator2, run_hddcoin_program
+from chia_rs import run_block_generator, run_block_generator2, run_chia_program
 
 from hddcoin.consensus.constants import ConsensusConstants
 from hddcoin.consensus.cost_calculator import NPCResult
@@ -133,7 +133,7 @@ def get_spends_for_block(generator: BlockGenerator, height: int, constants: Cons
     args += bytes(Program.to([bytes(a) for a in generator.generator_refs]))
     args += b"\x80\x80"
 
-    _, ret = run_hddcoin_program(
+    _, ret = run_chia_program(
         bytes(generator.program),
         bytes(args),
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
@@ -162,7 +162,7 @@ def get_spends_for_block_with_conditions(
 
     flags = get_flags_for_height_and_constants(height, constants)
 
-    _, ret = run_hddcoin_program(
+    _, ret = run_chia_program(
         bytes(generator.program),
         bytes(args),
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
