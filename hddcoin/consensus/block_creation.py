@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import chia_rs
-from chia_rs import compute_merkle_set_root
+from chia_rs import G1Element, G2Element, compute_merkle_set_root
 from chiabip158 import PyBIP158
 
 from hddcoin.consensus.block_record import BlockRecord
