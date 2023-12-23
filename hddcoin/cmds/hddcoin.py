@@ -14,7 +14,6 @@ from hddcoin.cmds.data import data_cmd
 from hddcoin.cmds.db import db_cmd
 from hddcoin.cmds.dev import dev_cmd
 from hddcoin.cmds.farm import farm_cmd
-from hddcoin.cmds.hodl import hodl_cmd
 from hddcoin.cmds.init import init_cmd
 from hddcoin.cmds.keys import keys_cmd
 from hddcoin.cmds.netspace import netspace_cmd
@@ -132,7 +131,6 @@ cli.add_command(beta_cmd)
 cli.add_command(completion)
 cli.add_command(dao_cmd)
 cli.add_command(dev_cmd)
-cli.add_command(hodl_cmd)
 
 
 def main() -> None:
