@@ -8,7 +8,7 @@ from multiprocessing import freeze_support
 from typing import Any, Dict, List, Optional, Tuple
 
 from hddcoin.consensus.constants import ConsensusConstants
-from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS, update_testnet_overrides
+from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.full_node.full_node import FullNode
 from hddcoin.full_node.full_node_api import FullNodeAPI
 from hddcoin.rpc.full_node_rpc_api import FullNodeRpcApi
@@ -75,7 +75,6 @@ async def async_main(service_config: Dict[str, Any]) -> int:
     config[SERVICE_NAME] = service_config
     network_id = service_config["selected_network"]
     overrides = service_config["network_overrides"]["constants"][network_id]
-    update_testnet_overrides(network_id, overrides)
     updated_constants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
     initialize_service_logging(service_name=SERVICE_NAME, config=config)
     service = await create_full_node_service(DEFAULT_ROOT_PATH, config, updated_constants)
