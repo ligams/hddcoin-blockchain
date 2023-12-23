@@ -125,7 +125,7 @@ GENERATOR_MOD: SerializedProgram = load_serialized_clvm_maybe_recompile(
 )
 
 DESERIALIZE_MOD = load_serialized_clvm_maybe_recompile(
-    "hddcoinlisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles"
+    "chialisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles"
 )
 
 test_constants = dataclasses.replace(

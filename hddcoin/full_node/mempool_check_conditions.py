@@ -32,7 +32,7 @@ from hddcoin.util.ints import uint16, uint32, uint64
 from hddcoin.wallet.puzzles.load_clvm import load_serialized_clvm_maybe_recompile
 
 DESERIALIZE_MOD = load_serialized_clvm_maybe_recompile(
-    "hddcoinlisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles"
+    "chialisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles"
 )
 
 log = logging.getLogger(__name__)

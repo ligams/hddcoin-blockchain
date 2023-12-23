@@ -6,7 +6,7 @@ from hddcoin.types.blockchain_format.program import INFINITE_COST, Program
 from hddcoin.util.byte_types import hexstr_to_bytes
 from hddcoin.wallet.puzzles.load_clvm import load_clvm
 
-DESERIALIZE_MOD = load_clvm("hddcoinlisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles")
+DESERIALIZE_MOD = load_clvm("chialisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles")
 
 
 def serialized_atom_overflow(size):

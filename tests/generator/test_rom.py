@@ -20,7 +20,7 @@ MAX_COST = int(1e15)
 COST_PER_BYTE = int(12000)
 
 
-DESERIALIZE_MOD = load_clvm("hddcoinlisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles")
+DESERIALIZE_MOD = load_clvm("chialisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles")
 GENERATOR_MOD: SerializedProgram = load_serialized_clvm_maybe_recompile(
     "rom_bootstrap_generator.clsp", package_or_requirement="hddcoin.consensus.puzzles"
 )
