@@ -24,7 +24,7 @@ class FeeRate(Streamable):
     mojos_per_clvm_cost: uint64
 
     @classmethod
-    def create(cls, mojos: Bytes, clvm_cost: CLVMCost) -> FeeRate:
+    def create(cls, bytes: Bytes, clvm_cost: CLVMCost) -> FeeRate:
         return cls(uint64(math.ceil(bytes / clvm_cost)))
 
 
