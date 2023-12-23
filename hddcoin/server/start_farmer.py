@@ -5,7 +5,7 @@ import sys
 from typing import Any, Dict, Optional
 
 from hddcoin.consensus.constants import ConsensusConstants
-from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS, update_testnet_overrides
+from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.farmer.farmer import Farmer
 from hddcoin.farmer.farmer_api import FarmerAPI
 from hddcoin.rpc.farmer_rpc_api import FarmerRpcApi
@@ -36,7 +36,6 @@ def create_farmer_service(
 
     network_id = service_config["selected_network"]
     overrides = service_config["network_overrides"]["constants"][network_id]
-    update_testnet_overrides(network_id, overrides)
     updated_constants = consensus_constants.replace_str_to_bytes(**overrides)
 
     farmer = Farmer(
