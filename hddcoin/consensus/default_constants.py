@@ -15,8 +15,8 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     SUB_SLOT_ITERS_STARTING=uint64(2**27),
     # DIFFICULTY_STARTING is the starting difficulty for the first epoch, which is then further
     # multiplied by another factor of DIFFICULTY_CONSTANT_FACTOR, to be used in the VDF iter calculation formula.
-    DIFFICULTY_CONSTANT_FACTOR=uint128(2**67),
-    DIFFICULTY_STARTING=uint64(7),
+    DIFFICULTY_CONSTANT_FACTOR=uint128(2**64),
+    DIFFICULTY_STARTING=uint64(71,
     DIFFICULTY_CHANGE_MAX_FACTOR=uint32(3),  # The next difficulty is truncated to range [prev / FACTOR, prev * FACTOR]
     # These 3 constants must be changed at the same time
     SUB_EPOCH_BLOCKS=uint32(384),  # The number of blocks per sub-epoch, mainnet 384
@@ -45,7 +45,7 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     ),
     MAX_VDF_WITNESS_SIZE=64,
     # Size of mempool = 10x the size of block
-    MEMPOOL_BLOCK_BUFFER=10,
+    MEMPOOL_BLOCK_BUFFER=50,
     # Max coin amount, fits into 64 bits
     MAX_COIN_AMOUNT=uint64((1 << 64) - 1),
     # Max block cost in clvm cost units
