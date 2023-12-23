@@ -33,13 +33,13 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     # Used as the initial cc rc challenges, as well as first block back pointers, and first SES back pointer
     # We override this value based on the chain being run (testnet0, testnet1, mainnet, etc)
     # Default used for tests is std_hash(b'')
-    "GENESIS_CHALLENGE": bytes.fromhex("f663a54192e4fc8832d62c5f914d1c3a15dd2a519c3ca23609a508f4641da23e"),
+    GENESIS_CHALLENGE=bytes.fromhex("f663a54192e4fc8832d62c5f914d1c3a15dd2a519c3ca23609a508f4641da23e"),
     # Forks of hddcoin should change this value to provide replay attack protection. This is set to mainnet genesis chall
-    "AGG_SIG_ME_ADDITIONAL_DATA": bytes.fromhex("49f4afb189342858dba5c1bb6b50b0deaa706088474f0c5431d65b857d54ddb5"),
-    "GENESIS_PRE_FARM_POOL_PUZZLE_HASH": bytes.fromhex(
+    AGG_SIG_ME_ADDITIONAL_DATA=bytes.fromhex("49f4afb189342858dba5c1bb6b50b0deaa706088474f0c5431d65b857d54ddb5"),
+    GENESIS_PRE_FARM_POOL_PUZZLE_HASH=bytes.fromhex(
         "5ed49df42106663947059a3323da310f24c804c6cf7420f3c1ac0cffb3f9d2b3"
     ),
-    "GENESIS_PRE_FARM_FARMER_PUZZLE_HASH": bytes.fromhex(
+    GENESIS_PRE_FARM_FARMER_PUZZLE_HASH=bytes.fromhex(
         "5ed49df42106663947059a3323da310f24c804c6cf7420f3c1ac0cffb3f9d2b3"
     ),
     MAX_VDF_WITNESS_SIZE=64,
@@ -50,19 +50,19 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     # Max block cost in clvm cost units
     MAX_BLOCK_COST_CLVM=11000000000,
     # The cost per byte of generator program
-    "COST_PER_BYTE": 12000,
-    "WEIGHT_PROOF_THRESHOLD": 2,
-    "BLOCKS_CACHE_SIZE": 4608 + (128 * 4),
-    "WEIGHT_PROOF_RECENT_BLOCKS": 1000,
-    "MAX_BLOCK_COUNT_PER_REQUESTS": 32,  # Allow up to 32 blocks per request
-    "MAX_GENERATOR_SIZE": 1000000,
-    "MAX_GENERATOR_REF_LIST_SIZE": 512,  # Number of references allowed in the block generator ref list
-    "POOL_SUB_SLOT_ITERS": 37600000000,  # iters limit * NUM_SPS
-    "SOFT_FORK2_HEIGHT": 3700000,
+    COST_PER_BYTE=12000,
+    WEIGHT_PROOF_THRESHOLD=2,
+    BLOCKS_CACHE_SIZE=4608 + (128 * 4),
+    WEIGHT_PROOF_RECENT_BLOCKS=1000,
+    MAX_BLOCK_COUNT_PER_REQUESTS=32,  # Allow up to 32 blocks per request
+    MAX_GENERATOR_SIZE=1000000,
+    MAX_GENERATOR_REF_LIST_SIZE=512,  # Number of references allowed in the block generator ref list
+    POOL_SUB_SLOT_ITERS=37600000000,  # iters limit * NUM_SPS
+    SOFT_FORK2_HEIGHT=3700000,
     # September 2023
-    "SOFT_FORK3_HEIGHT": 3750000,
+    SOFT_FORK3_HEIGHT=3750000,
     # June 2024
-    "HARD_FORK_HEIGHT": 4996000,
+    HARD_FORK_HEIGHT=4996000,
     # June 2027
     PLOT_FILTER_128_HEIGHT=uint32(10542000),
     # June 2030
@@ -72,4 +72,4 @@ DEFAULT_CONSTANTS = ConsensusConstants(
 )
 
 
-DEFAULT_CONSTANTS = ConsensusConstants(**default_kwargs)  # type: ignore
+#DEFAULT_CONSTANTS = ConsensusConstants(**default_kwargs)  # type: ignore
