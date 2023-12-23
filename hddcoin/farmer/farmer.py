@@ -33,7 +33,7 @@ from hddcoin.protocols.pool_protocol import (
 from hddcoin.protocols.protocol_message_types import ProtocolMessageTypes
 from hddcoin.rpc.rpc_server import StateChangedProtocol, default_get_connections
 from hddcoin.server.outbound_message import NodeType, make_msg
-from hddcoin.server.server import ChiaServer, ssl_context_for_root
+from hddcoin.server.server import HDDcoinServer, ssl_context_for_root
 from hddcoin.server.ws_connection import WSHDDcoinConnection
 from hddcoin.ssl.create_ssl import get_mozilla_ca_crt
 from hddcoin.types.blockchain_format.proof_of_space import ProofOfSpace
@@ -296,7 +296,7 @@ class Farmer:
             self.plot_sync_receivers[peer.peer_node_id] = Receiver(peer, self.plot_sync_callback)
             self.harvester_handshake_task = asyncio.create_task(handshake_task())
 
-    def set_server(self, server: ChiaServer) -> None:
+    def set_server(self, server: HDDcoinServer) -> None:
         self.server = server
 
     def state_changed(self, change: str, data: Dict[str, Any]) -> None:
