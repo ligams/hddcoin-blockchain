@@ -4,26 +4,28 @@ from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 import pytest
-from blspy import G2Element
+from chia_rs import G2Element
 
 from hddcoin.clvm.spend_sim import sim_and_client
 from hddcoin.types.announcement import Announcement
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import Program
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.types.coin_spend import CoinSpend
+from hddcoin.types.coin_spend import CoinSpend, make_spend
 from hddcoin.types.mempool_inclusion_status import MempoolInclusionStatus
 from hddcoin.types.spend_bundle import SpendBundle
 from hddcoin.util.ints import uint64
 from hddcoin.wallet.cat_wallet.cat_utils import (
+    CAT_MOD,
     SpendableCAT,
     construct_cat_puzzle,
     unsigned_spend_bundle_for_spendable_cats,
 )
+from hddcoin.wallet.conditions import ConditionValidTimes
 from hddcoin.wallet.outer_puzzles import AssetType
 from hddcoin.wallet.payment import Payment
 from hddcoin.wallet.puzzle_drivers import PuzzleInfo
-from hddcoin.wallet.puzzles.cat_loader import CAT_MOD
 from hddcoin.wallet.trading.offer import OFFER_MOD, NotarizedPayment, Offer
 
 acs = Program.to(1)
@@ -36,7 +38,7 @@ def str_to_tail(tail_str: str) -> Program:
 
 
 def str_to_tail_hash(tail_str: str) -> bytes32:
-    return Program.to([3, [], [1, tail_str], []]).get_tree_hash()
+    return str_to_tail(tail_str).get_tree_hash()
 
 
 def str_to_cat_hash(tail_str: str) -> bytes32:
@@ -59,15 +61,17 @@ async def generate_coins(
         for amount in amounts:
             if tail_str:
                 tail: Program = str_to_tail(tail_str)  # Making a fake but unique TAIL
-                cat_puzzle: Program = construct_cat_puzzle(CAT_MOD, tail.get_tree_hash(), acs)
-                payments.append(Payment(cat_puzzle.get_tree_hash(), amount))
+                tail_hash = tail.get_tree_hash()
+                cat_puzzle: Program = construct_cat_puzzle(CAT_MOD, tail_hash, acs)
+                cat_puzzle_hash = cat_puzzle.get_tree_hash()
+                payments.append(Payment(cat_puzzle_hash, amount))
                 cat_bundles.append(
                     unsigned_spend_bundle_for_spendable_cats(
                         CAT_MOD,
                         [
                             SpendableCAT(
-                                Coin(parent_coin.name(), cat_puzzle.get_tree_hash(), amount),
-                                tail.get_tree_hash(),
+                                Coin(parent_coin.name(), cat_puzzle_hash, amount),
+                                tail_hash,
                                 acs,
                                 Program.to([[51, acs_ph, amount], [51, 0, -113, tail, []]]),
                             )
@@ -80,7 +84,7 @@ async def generate_coins(
     # This bundle creates all of the initial coins
     parent_bundle = SpendBundle(
         [
-            CoinSpend(
+            make_spend(
                 parent_coin,
                 acs,
                 Program.to([[51, p.puzzle_hash, p.amount] for p in payments]),
@@ -97,7 +101,7 @@ async def generate_coins(
     coin_dict: Dict[Optional[str], List[Coin]] = {}
     for tail_str, _ in requested_coins.items():
         if tail_str:
-            tail_hash: bytes32 = str_to_tail_hash(tail_str)
+            tail_hash = str_to_tail_hash(tail_str)
             cat_ph: bytes32 = construct_cat_puzzle(CAT_MOD, tail_hash, acs).get_tree_hash()
             coin_dict[tail_str] = [
                 cr.coin for cr in await sim_client.get_coin_records_by_puzzle_hash(cat_ph, include_spent_coins=False)
@@ -136,12 +140,12 @@ def generate_secure_bundle(
     if tail_str is None:
         bundle = SpendBundle(
             [
-                CoinSpend(
+                make_spend(
                     selected_coins[0],
                     acs,
                     Program.to(inner_solution),
                 ),
-                *[CoinSpend(c, acs, Program.to([])) for c in non_primaries],
+                *[make_spend(c, acs, Program.to([])) for c in non_primaries],
             ],
             G2Element(),
         )
@@ -166,7 +170,7 @@ def generate_secure_bundle(
 
 
 class TestOfferLifecycle:
-    @pytest.mark.asyncio()
+    @pytest.mark.anyio()
     async def test_complex_offer(self, cost_logger):
         async with sim_and_client() as (sim, sim_client):
             coins_needed: Dict[Optional[str], List[int]] = {
@@ -282,15 +286,16 @@ class TestOfferLifecycle:
             assert new_offer.get_requested_amounts() == {None: 900, str_to_tail_hash("red"): 350}
             assert new_offer.summary() == (
                 {
-                    "hdd": 1000,
+                    "xch": 1000,
                     str_to_tail_hash("red").hex(): 350,
                     str_to_tail_hash("blue").hex(): 2000,
                 },
-                {"hdd": 900, str_to_tail_hash("red").hex(): 350},
+                {"xch": 900, str_to_tail_hash("red").hex(): 350},
                 driver_dict_as_infos,
+                ConditionValidTimes(),
             )
             assert new_offer.get_pending_amounts() == {
-                "hdd": 1200,
+                "xch": 1200,
                 str_to_tail_hash("red").hex(): 350,
                 str_to_tail_hash("blue").hex(): 3000,
             }
@@ -298,7 +303,7 @@ class TestOfferLifecycle:
 
             # Test preventing TAIL from running during exchange
             blue_cat_puz: Program = construct_cat_puzzle(CAT_MOD, str_to_tail_hash("blue"), OFFER_MOD)
-            blue_spend: CoinSpend = CoinSpend(
+            blue_spend: CoinSpend = make_spend(
                 Coin(bytes32(32), blue_cat_puz.get_tree_hash(), uint64(0)),
                 blue_cat_puz,
                 Program.to([[bytes32(32), [bytes32(32), 200, ["hey there"]]]]),
@@ -309,8 +314,10 @@ class TestOfferLifecycle:
             real_blue_spend = [spend for spend in valid_spend.coin_spends if b"hey there" in bytes(spend)][0]
             real_blue_spend_replaced = replace(
                 real_blue_spend,
-                solution=real_blue_spend.solution.to_program().replace(
-                    ffrfrf=Program.to(-113), ffrfrr=Program.to([str_to_tail("blue"), []])
+                solution=SerializedProgram.from_program(
+                    real_blue_spend.solution.to_program().replace(
+                        ffrfrf=Program.to(-113), ffrfrr=Program.to([str_to_tail("blue"), []])
+                    )
                 ),
             )
             valid_spend = SpendBundle(

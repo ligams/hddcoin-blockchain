@@ -2,23 +2,25 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from blspy import G2Element
+from chia_rs import G2Element
 
 from hddcoin.protocols.wallet_protocol import CoinState
 from hddcoin.types.announcement import Announcement
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import Program
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.types.coin_spend import CoinSpend
+from hddcoin.types.coin_spend import CoinSpend, make_spend
 from hddcoin.types.spend_bundle import SpendBundle
 from hddcoin.util.db_wrapper import DBWrapper2
 from hddcoin.util.ints import uint32, uint64
+from hddcoin.wallet.conditions import Condition
 from hddcoin.wallet.notification_store import Notification, NotificationStore
 from hddcoin.wallet.transaction_record import TransactionRecord
 from hddcoin.wallet.util.compute_memos import compute_memos_for_spend
 from hddcoin.wallet.util.notifications import construct_notification
+from hddcoin.wallet.util.tx_config import TXConfig
 from hddcoin.wallet.util.wallet_types import WalletType
 
 
@@ -82,27 +84,37 @@ class NotificationManager:
             return True
 
     async def send_new_notification(
-        self, target: bytes32, msg: bytes, amount: uint64, fee: uint64 = uint64(0)
+        self,
+        target: bytes32,
+        msg: bytes,
+        amount: uint64,
+        tx_config: TXConfig,
+        fee: uint64 = uint64(0),
+        extra_conditions: Tuple[Condition, ...] = tuple(),
     ) -> TransactionRecord:
-        coins: Set[Coin] = await self.wallet_state_manager.main_wallet.select_coins(uint64(amount + fee))
+        coins: Set[Coin] = await self.wallet_state_manager.main_wallet.select_coins(
+            uint64(amount + fee), tx_config.coin_selection_config
+        )
         origin_coin: bytes32 = next(iter(coins)).name()
         notification_puzzle: Program = construct_notification(target, amount)
         notification_hash: bytes32 = notification_puzzle.get_tree_hash()
         notification_coin: Coin = Coin(origin_coin, notification_hash, amount)
-        notification_spend = CoinSpend(
+        notification_spend = make_spend(
             notification_coin,
             notification_puzzle,
             Program.to(None),
         )
         extra_spend_bundle = SpendBundle([notification_spend], G2Element())
-        hddcoin_tx = await self.wallet_state_manager.main_wallet.generate_signed_transaction(
+        [hddcoin_tx] = await self.wallet_state_manager.main_wallet.generate_signed_transaction(
             amount,
             notification_hash,
+            tx_config,
             fee,
             coins=coins,
             origin_id=origin_coin,
             coin_announcements_to_consume={Announcement(notification_coin.name(), b"")},
             memos=[target, msg],
+            extra_conditions=extra_conditions,
         )
         full_tx: TransactionRecord = dataclasses.replace(
             hddcoin_tx, spend_bundle=SpendBundle.aggregate([hddcoin_tx.spend_bundle, extra_spend_bundle])

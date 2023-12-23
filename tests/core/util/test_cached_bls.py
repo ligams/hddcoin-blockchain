@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from blspy import AugSchemeMPL, G1Element
+from chia_rs import AugSchemeMPL, G1Element
 
 from hddcoin.util import cached_bls
 from hddcoin.util.hash import std_hash

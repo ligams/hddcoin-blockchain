@@ -15,7 +15,6 @@ from typing import Any, Dict, Optional
 import pytest
 import yaml
 
-from hddcoin.simulator.time_out_assert import adjusted_timeout
 from hddcoin.util.config import (
     config_path_for_filename,
     create_default_hddcoin_config,
@@ -26,6 +25,7 @@ from hddcoin.util.config import (
     save_config,
     selected_network_address_prefix,
 )
+from hddcoin.util.timing import adjusted_timeout
 
 # Commented-out lines are preserved to aid in debugging the multiprocessing tests
 # import logging
@@ -171,7 +171,7 @@ class TestConfig:
         expected_content: str = initial_config_file("config.yaml")
         assert len(expected_content) > 0
 
-        with open(config_file_path, "r") as f:
+        with open(config_file_path) as f:
             actual_content: str = f.read()
             # Expect: config.yaml contents are seeded with initial contents
             assert actual_content == expected_content
@@ -197,7 +197,7 @@ class TestConfig:
         expected_content: str = initial_config_file("config.yaml")
         assert len(expected_content) > 0
 
-        with open(config_file_path, "r") as f:
+        with open(config_file_path) as f:
             actual_content: str = f.read()
             # Expect: config.yaml contents are overwritten with initial contents
             assert actual_content == expected_content
@@ -211,7 +211,7 @@ class TestConfig:
         config: Dict = load_config(root_path=root_path, filename="config.yaml")
         assert config is not None
         # Expect: config values should match the defaults (from a small sampling)
-        assert config["daemon_port"] == default_config_dict["daemon_port"] == 25400
+        assert config["daemon_port"] == default_config_dict["daemon_port"] == 55400
         assert config["self_hostname"] == default_config_dict["self_hostname"] == "localhost"
         assert (
             config["farmer"]["network_overrides"]["constants"]["mainnet"]["GENESIS_CHALLENGE"]
@@ -244,16 +244,19 @@ class TestConfig:
         root_path: Path = root_path_populated_with_config
         config: Dict = copy.deepcopy(default_config_dict)
         # When: modifying the config
-        config["harvester"]["farmer_peer"]["host"] = "oldmacdonald.eie.io"
+        config["harvester"]["farmer_peers"][0]["host"] = "oldmacdonald.eie.io"
         # Sanity check that we didn't modify the default config
-        assert config["harvester"]["farmer_peer"]["host"] != default_config_dict["harvester"]["farmer_peer"]["host"]
+        assert (
+            config["harvester"]["farmer_peers"][0]["host"]
+            != default_config_dict["harvester"]["farmer_peers"][0]["host"]
+        )
         # When: saving the modified config
         with lock_config(root_path, "config.yaml"):
             save_config(root_path=root_path, filename="config.yaml", config_data=config)
 
         # Expect: modifications should be preserved in the config read from disk
         loaded: Dict = load_config(root_path=root_path, filename="config.yaml")
-        assert loaded["harvester"]["farmer_peer"]["host"] == "oldmacdonald.eie.io"
+        assert loaded["harvester"]["farmer_peers"][0]["host"] == "oldmacdonald.eie.io"
 
     def test_multiple_writers(self, root_path_populated_with_config, default_config_dict):
         """
@@ -278,7 +281,7 @@ class TestConfig:
             except TimeoutError:
                 pytest.skip("Timed out waiting for reader/writer processes to complete")
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_non_atomic_writes(self, root_path_populated_with_config, default_config_dict):
         """
         Test whether one continuous writer (writing constantly, but not atomically) will interfere with many
@@ -309,26 +312,26 @@ class TestConfig:
     @pytest.mark.parametrize("prefix", [None])
     def test_selected_network_address_prefix_default_config(self, config_with_address_prefix: Dict[str, Any]) -> None:
         """
-        Temp config.yaml created using a default config. address_prefix is defaulted to "hdd"
+        Temp config.yaml created using a default config. address_prefix is defaulted to "xch"
         """
         config = config_with_address_prefix
         prefix = selected_network_address_prefix(config)
-        assert prefix == "hdd"
+        assert prefix == "xch"
 
-    @pytest.mark.parametrize("prefix", ["thdd"])
+    @pytest.mark.parametrize("prefix", ["txch"])
     def test_selected_network_address_prefix_testnet_config(self, config_with_address_prefix: Dict[str, Any]) -> None:
         """
-        Temp config.yaml created using a modified config. address_prefix is set to "thdd"
+        Temp config.yaml created using a modified config. address_prefix is set to "txch"
         """
         config = config_with_address_prefix
         prefix = selected_network_address_prefix(config)
-        assert prefix == "thdd"
+        assert prefix == "txch"
 
     def test_selected_network_address_prefix_config_dict(self, default_config_dict: Dict[str, Any]) -> None:
         """
-        Modified config dictionary has address_prefix set to "customhdd"
+        Modified config dictionary has address_prefix set to "customxch"
         """
         config = default_config_dict
-        config["network_overrides"]["config"][config["selected_network"]]["address_prefix"] = "customhdd"
+        config["network_overrides"]["config"][config["selected_network"]]["address_prefix"] = "customxch"
         prefix = selected_network_address_prefix(config)
-        assert prefix == "customhdd"
+        assert prefix == "customxch"

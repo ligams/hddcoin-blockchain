@@ -7,7 +7,7 @@ from hddcoin.full_node.signage_point import SignagePoint
 from hddcoin.rpc.rpc_client import RpcClient
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.coin_record import CoinRecord
-from hddcoin.types.coin_spend import CoinSpend
+from hddcoin.types.coin_spend import CoinSpend, CoinSpendWithConditions
 from hddcoin.types.end_of_slot_bundle import EndOfSubSlotBundle
 from hddcoin.types.full_block import FullBlock
 from hddcoin.types.spend_bundle import SpendBundle
@@ -23,9 +23,9 @@ def coin_record_dict_backwards_compat(coin_record: Dict[str, Any]) -> Dict[str, 
 
 class FullNodeRpcClient(RpcClient):
     """
-    Client to HDDcoin RPC, connects to a local full node. Uses HTTP/JSON, and converts back from
+    Client to Chia RPC, connects to a local full node. Uses HTTP/JSON, and converts back from
     JSON into native python objects before returning. All api calls use POST requests.
-    Note that this is not the same as the peer protocol, or wallet protocol (which run HDDcoin's
+    Note that this is not the same as the peer protocol, or wallet protocol (which run Chia's
     protocol on top of TCP), it's a separate protocol on top of HTTP that provides easy access
     to the full node.
     """
@@ -208,6 +208,17 @@ class FullNodeRpcClient(RpcClient):
         except Exception:
             return None
 
+    async def get_block_spends_with_conditions(self, header_hash: bytes32) -> Optional[List[CoinSpendWithConditions]]:
+        try:
+            response = await self.fetch("get_block_spends_with_conditions", {"header_hash": header_hash.hex()})
+            block_spends: List[CoinSpendWithConditions] = []
+            for block_spend in response["block_spends_with_conditions"]:
+                block_spends.append(CoinSpendWithConditions.from_json_dict(block_spend))
+            return block_spends
+
+        except Exception:
+            return None
+
     async def push_tx(self, spend_bundle: SpendBundle) -> Dict[str, Any]:
         return await self.fetch("push_tx", {"spend_bundle": spend_bundle.to_json_dict()})
 
@@ -241,6 +252,10 @@ class FullNodeRpcClient(RpcClient):
             return cast(Dict[str, Any], response["mempool_item"])
         except Exception:
             return None
+
+    async def get_mempool_items_by_coin_name(self, coin_name: bytes32) -> Dict[str, Any]:
+        response = await self.fetch("get_mempool_items_by_coin_name", {"coin_name": coin_name.hex()})
+        return response
 
     async def get_recent_signage_point_or_eos(
         self, sp_hash: Optional[bytes32], challenge_hash: Optional[bytes32]

@@ -15,8 +15,8 @@ from typing import Any, Dict, Iterator, List
 
 # to enable this instrumentation, set one of the environment variables:
 
-#   HDDCOIN_INSTRUMENT_NODE=1
-#   HDDCOIN_INSTRUMENT_WALLET=1
+#   CHIA_INSTRUMENT_NODE=1
+#   CHIA_INSTRUMENT_WALLET=1
 
 # Before starting the daemon.
 
@@ -155,9 +155,6 @@ def get_file(frame: FrameType) -> str:
 
 
 def trace_fun(frame: FrameType, event: str, arg: Any) -> None:
-    if sys.version_info < (3, 8):
-        raise Exception(f"Python 3.8 or higher required, running with: {sys.version}")
-
     if event in ["c_call", "c_return", "c_exception"]:
         return
 

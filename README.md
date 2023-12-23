@@ -1,120 +1,73 @@
-# hddcoin-blockchain 
+# hddcoin-blockchain
 
-[![HDDcoin Network logo](https://hddcoin.org/images/hddcoin_100.png "HDDcoin logo")](https://www.hddcoin.org/)
+[![Chia Network logo](https://www.hddcoin.org/wp-content/uploads/2022/09/hddcoin-logo.svg "Chia logo")](https://www.hddcoin.org/)
 
-| Current Release / main | Pre Release / beta |
-|         :---:          |          :---:         |
-| [![Ubuntu Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml/badge.svg)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml) [![MacOS Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml/badge.svg)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml) [![Windows Installer on Windows 10](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml/badge.svg)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml)  |  [![Ubuntu Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml/badge.svg?branch=beta)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-linux-installer-deb.yml) [![MacOS Core Tests](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml/badge.svg?branch=beta)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-macos-installer.yml) [![Windows Installer on Windows 10](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml/badge.svg?branch=beta)](https://github.com/HDDcoin-Network/hddcoin-blockchain/actions/workflows/build-windows-installer.yml) |
+![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownload.hddcoin.org%2Flatest%2Fbadge-data.json&query=%24.message&logo=hddcoinnetwork&label=Latest%20Release&labelColor=%231e2b2e&color=%230d3349)
+<br />
+![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownload.hddcoin.org%2Flatest%2Fbadge-data-rc.json&query=%24.message&logo=hddcoinnetwork&logoColor=white&label=Latest%20RC&labelColor=%230d3349&color=%23474748)
+<br />
+![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownload.hddcoin.org%2Flatest%2Fbadge-data-beta.json&query=%24.message&logo=hddcoinnetwork&logoColor=black&label=Latest%20Beta&labelColor=%23e9fbbc&color=%231e2b2e)
 
+![Coveralls](https://img.shields.io/coverallsCoverage/github/Chia-Network/hddcoin-blockchain?logo=Coveralls&logoColor=red&labelColor=%23212F39)
+<br />
+![GitHub all releases](https://img.shields.io/github/downloads/Chia-Network/hddcoin-blockchain/total?logo=GitHub)
+<br />
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/Chia-Network/hddcoin-blockchain?logo=GitHub)
+<br />
+![GitHub contributors](https://img.shields.io/github/contributors/Chia-Network/hddcoin-blockchain?logo=GitHub)
 
-***********************************************
-# PROJECT DESCRIPTION
-HDDcoin is an eco-friendly decentralization blockchain based on the Proof of Space and Time (PoST) consensus pioneered by Chia™. It maintains network robustness, in line with Satoshi Nakamoto's principles.
+[![Chia Discord](https://dcbadge.vercel.app/api/server/hddcoin?style=flat&theme=full-presence)](https://discord.gg/hddcoin)
+<br />
+![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UChFkJ3OAUvnHZdiQISWdWPA?style=flat-square&logo=youtube&logoColor=%23ff0000&labelColor=%230f0f0f&color=%23272727)
+<br />
+![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/hddcoin?style=flat-square&logo=reddit&labelColor=%230b1416&color=%23222222)
+<br />
+![Twitter Follow](https://img.shields.io/twitter/follow/hddcoin_project?style=flat-square&logo=x.org&logoColor=white&labelColor=black)
 
-HDDcoin uses the powerful and secure Chialisp language for Smart Contracts, and supports digital money, global payments and applications. HDDcoin is not affiliated with Chia Network, Inc., but uses their open-sourced software as its foundation.
+<!-- #![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownload.hddcoin.org%2Flatest%2Fbadge-data-beta.json&query=%24.message&logo=hddcoinnetwork&logoColor=%23e9fbbc&label=Latest%20Beta&labelColor=%23474748&color=%231e2b2e&link=https%3A%2F%2Fgithub.com%2FChia-Network%2Fhddcoin-blockchain%2Freleases&link=https%3A%2F%2Fgithub.com%2FChia-Network%2Fhddcoin-blockchain%2Freleases)>
+<!-- ![Discord Shield](https://discordapp.com/api/guilds/1034523881404370984/widget.png?style=shield>
+<!-- [![Discord](https://img.shields.io/discord/1034523881404370984.svg?label=Discord&logo=discord&colorB=1e2b2f)](https://discord.gg/hddcoin) -->
 
-Farming HDDcoin does not consume significant amounts of electricity, and utilizes hard drive space, instead of specialized computing hardware that most Proof of Work (PoW) consensus blockchains have come to demand. Moreover, since electrical energy costs for running hard drives is very minimal, due to this low cost of entry, HDDcoin will remain more decentralized and fair, and thus more secure than any Proof of Stake cryptocurrency.
+Chia is a modern cryptocurrency built from scratch, designed to be efficient, decentralized, and secure. Here are some of the features and benefits:
+* [Proof of space and time](https://docs.google.com/document/d/1tmRIb7lgi4QfKkNaxuKOBHRmwbVlGL4f7EsBDr_5xZE/edit) based consensus which allows anyone to farm with commodity hardware
+* Very easy to use full node and farmer GUI and cli (thousands of nodes active on mainnet)
+* [Chia seeder](https://github.com/Chia-Network/hddcoin-blockchain/wiki/Chia-Seeder-User-Guide), which maintains a list of reliable nodes within the Chia network via a built-in DNS server.
+* Simplified UTXO based transaction model, with small on-chain state
+* Lisp-style Turing-complete functional [programming language](https://hddcoinlisp.com/) for money related use cases
+* BLS keys and aggregate signatures (only one signature per block)
+* [Pooling protocol](https://github.com/Chia-Network/hddcoin-blockchain/wiki/Pooling-User-Guide) that allows farmers to have control of making blocks
+* Support for light clients with fast, objective syncing
+* A growing community of farmers and developers around the world
 
-HDDcoin core values include green cryptocurrency, long term value, building for the future, strength in community, and maintaining a huge team to ensure long term development.
+Please check out the [Chia website](https://www.hddcoin.org/), the [wiki](https://github.com/Chia-Network/hddcoin-blockchain/wiki), and [FAQ](https://github.com/Chia-Network/hddcoin-blockchain/wiki/FAQ) for
+information on this project.
 
-The goal of HDDcoin is to reshape the global financial system through the power of the blockchain technology, powered by thousands of nodes maintained by the community, and with transparency and a commitment to the environment — thereby taking control from any central entity, person or organization, and giving that control back to the community.
+Python 3.8.1+ is required. Make sure your default python version is >=3.8.1
+by typing `python3`.
 
-**BLOCKCHAIN SPECIFICATION:**
-- Launch date: July 8th 2021
-- Cryptocurrency coin: HDD
-- Lowest coin denomination: Bytes
-- Conversion: 1 HDD = 1,000,000,000,000 Bytes
-- Blocks per 24 hours target: 4,608
-- Farmed rewards per block: 2 HDD
-- Halving period for block rewards: 3 years
+If you are behind a NAT, it can be difficult for peers outside your subnet to
+reach you when they start up. You can enable
+[UPnP](https://www.homenethowto.com/ports-and-nat/upnp-automatic-port-forward/)
+on your router or add a NAT (for IPv4 but not IPv6) and firewall rules to allow
+TCP port 8444 access to your peer.
+These methods tend to be router make/model specific.
 
-**BLOCKCHAIN RESOURCES:**
-- Website: https://hddcoin.org
-- Online Store: https://store.hddcoin.org
-- Explorer: https://explorer.hddcoin.org
-- Graphs: https://graphs.hddcoin.org
-- White Paper: https://hddcoin.org/white-paper
-- Roadmap: https://hddcoin.org/roadmap
-- Calculator: https://chiaforkscalculator.com/hddcoin
-- HDDcoin DB: https://download.hddcoin.org/blockchain_v1_mainnet.sqlite
+Most users should only install harvesters, farmers, plotter, full nodes, and wallets.
+Setting up a seeder is best left to more advanced users.
+Building Timelords and VDFs is for sophisticated users, in most environments.
+Chia Network and additional volunteers are running sufficient Timelords
+for consensus.
 
-**COMMUNITIES AND SOCIAL CHANNELS:**
-- Discord: https://discord.gg/AZdGSFnqAR
-- Twitter: https://twitter.com/hddcoin
-- Facebook: https://www.facebook.com/HDDcoinNetwork
-- Reddit: https://www.reddit.com/r/HDDcoinNetwork
-- YouTube: https://www.youtube.com/channel/UChJY3YEOTDBvFJ0vLFEc1Sw
-- Telegram: https://t.me/HDDcoin_Network
+## Installing
 
+Install instructions are available in the
+[INSTALL](https://github.com/Chia-Network/hddcoin-blockchain/wiki/INSTALL)
+section of the
+[hddcoin-blockchain repository wiki](https://github.com/Chia-Network/hddcoin-blockchain/wiki).
 
-***********************************************
-# CO-FARMING WITH COMPATIBLE PLOTS?
-Please note that if you wish to co-farm with compatible plots made using the Client of another blockchain (like Chia™), or any other plotting tool like MadMax, because public keys are encoded in the plots, in order to utilize these plots for HDDcoin, you'll need to set the same mnemonic phrase (24 words) that you used for creating the plots. Learn more on our FAQ page -- https://hddcoin.org/faq.
- 
-***********************************************
-# INSTALL INSTRUCTIONS:
+## Running
 
-You can install HDDcoin by building from source, or by using the latest binaries for your operating system.
-
-(A.) To **install from available binaries**, download executables from:  https://github.com/HDDcoin-Network/hddcoin-blockchain/releases
-
-
-(B.) To **build from source**, do the following:
-
-```
-# Update / Upgrade OS:
-
-   sudo apt-get update
-   sudo apt-get upgrade -y
-
-# Install Git:
-
-   sudo apt install git -y
-
-# Checkout the correct source:
-
-   git clone https://github.com/HDDcoin-Network/hddcoin-blockchain.git
-
-  
-# Install the Blockchain:
-
-   cd hddcoin-blockchain
-   sh install.sh
-   . ./activate
-   hddcoin init
-
-# Install and run the GUI:
-
-   sh install-gui.sh
-   bash start-gui.sh &
-```
-
-If the client does not find any connections automatically, you can add any of the following:
-
-- introducer.hddcoin.org / Port: 28444
-- dns-introducer.hddcoin.org / Port: 28444
-
-***********************************************
-# UPDATE/UPGRADE INSTRUCTIONS:
-
-You can update HDDcoin from a previous version by downloading and installing the latest executable for your operating system, available from the **Releases page**, or by building from source:
-
-```
-# Checkout the source and update
-
-  cd hddcoin-blockchain
-  . ./activate
-  hddcoin stop -d all
-  deactivate
-  git fetch
-  git checkout main
-  git reset --hard FETCH_HEAD --recurse-submodules
-  sh install.sh
-  . ./activate
-  hddcoin init
-
-# Update the GUI
-
-  chmod +x ./install-gui.sh
-  ./install-gui.sh
-```
+Once installed, a
+[Quick Start Guide](https://github.com/Chia-Network/hddcoin-blockchain/wiki/Quick-Start-Guide)
+is available from the repository
+[wiki](https://github.com/Chia-Network/hddcoin-blockchain/wiki).

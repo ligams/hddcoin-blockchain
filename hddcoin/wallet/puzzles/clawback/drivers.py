@@ -7,7 +7,7 @@ from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import Program
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.types.coin_spend import CoinSpend
+from hddcoin.types.coin_spend import CoinSpend, make_spend
 from hddcoin.types.condition_opcodes import ConditionOpcode
 from hddcoin.util.condition_tools import conditions_for_solution
 from hddcoin.util.ints import uint64
@@ -178,4 +178,4 @@ def generate_clawback_spend_bundle(
     solution: Program = create_merkle_solution(
         time_lock, metadata.sender_puzzle_hash, metadata.recipient_puzzle_hash, inner_puzzle, inner_solution
     )
-    return CoinSpend(coin, puzzle, solution)
+    return make_spend(coin, puzzle, solution)

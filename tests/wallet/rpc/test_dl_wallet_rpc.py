@@ -8,24 +8,23 @@ import pytest
 from hddcoin.consensus.block_rewards import calculate_base_farmer_reward, calculate_pool_reward
 from hddcoin.data_layer.data_layer_wallet import Mirror
 from hddcoin.rpc.wallet_rpc_client import WalletRpcClient
-from hddcoin.simulator.setup_nodes import SimulatorsAndWalletsServices
 from hddcoin.simulator.simulator_protocol import FarmNewBlockProtocol
-from hddcoin.simulator.time_out_assert import time_out_assert
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.peer_info import PeerInfo
-from hddcoin.util.ints import uint16, uint32, uint64
+from hddcoin.util.ints import uint32, uint64
 from hddcoin.wallet.db_wallet.db_wallet_puzzles import create_mirror_puzzle
+from tests.conftest import ConsensusMode
 from tests.util.rpc import validate_get_routes
+from tests.util.setup_nodes import SimulatorsAndWalletsServices
+from tests.util.time_out_assert import time_out_assert
 
 log = logging.getLogger(__name__)
 
 
 class TestWalletRpc:
-    @pytest.mark.parametrize(
-        "trusted",
-        [True, False],
-    )
-    @pytest.mark.asyncio
+    @pytest.mark.limit_consensus_modes(allowed=[ConsensusMode.PLAIN, ConsensusMode.HARD_FORK_2_0], reason="save time")
+    @pytest.mark.parametrize("trusted", [True, False])
+    @pytest.mark.anyio
     async def test_wallet_make_transaction(
         self, two_wallet_nodes_services: SimulatorsAndWalletsServices, trusted: bool, self_hostname: str
     ) -> None:
@@ -47,8 +46,8 @@ class TestWalletRpc:
             wallet_node.config["trusted_peers"] = {}
             wallet_node_2.config["trusted_peers"] = {}
 
-        await server_2.start_client(PeerInfo(self_hostname, uint16(full_node_server._port)), None)
-        await server_3.start_client(PeerInfo(self_hostname, uint16(full_node_server._port)), None)
+        await server_2.start_client(PeerInfo(self_hostname, full_node_server.get_port()), None)
+        await server_3.start_client(PeerInfo(self_hostname, full_node_server.get_port()), None)
 
         for i in range(0, num_blocks):
             await full_node_api.farm_new_transaction_block(FarmNewBlockProtocol(ph))

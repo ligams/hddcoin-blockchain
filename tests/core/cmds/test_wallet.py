@@ -23,18 +23,18 @@ async def cat_name_resolver(asset_id: bytes32) -> Optional[Tuple[Optional[uint32
     return TEST_ASSET_ID_NAME_MAPPING.get(asset_id)
 
 
-@pytest.mark.asyncio
-async def test_print_offer_summary_hdd(capsys: Any) -> None:
-    summary_dict = {"hdd": 1_000_000_000_000}
+@pytest.mark.anyio
+async def test_print_offer_summary_xch(capsys: Any) -> None:
+    summary_dict = {"xch": 1_000_000_000_000}
 
     await print_offer_summary(cat_name_resolver, summary_dict)
 
     captured = capsys.readouterr()
 
-    assert "HDD (Wallet ID: 1): 1.0 (1000000000000 bytes)" in captured.out
+    assert "HDD (Wallet ID: 1): 1.0 (1000000000000 mojos)" in captured.out
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_print_offer_summary_cat(capsys: Any) -> None:
     summary_dict = {
         TEST_DUCKSAUCE_ASSET_ID: 1_000,
@@ -44,10 +44,10 @@ async def test_print_offer_summary_cat(capsys: Any) -> None:
 
     captured = capsys.readouterr()
 
-    assert "DuckSauce (Wallet ID: 2): 1.0 (1000 bytes)" in captured.out
+    assert "DuckSauce (Wallet ID: 2): 1.0 (1000 mojos)" in captured.out
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_print_offer_summary_multiple_cats(capsys: Any) -> None:
     summary_dict = {
         TEST_DUCKSAUCE_ASSET_ID: 1_000,
@@ -58,14 +58,14 @@ async def test_print_offer_summary_multiple_cats(capsys: Any) -> None:
 
     captured = capsys.readouterr()
 
-    assert "DuckSauce (Wallet ID: 2): 1.0 (1000 bytes)" in captured.out
-    assert "CrunchBerries (Wallet ID: 3): 2.0 (2000 bytes)" in captured.out
+    assert "DuckSauce (Wallet ID: 2): 1.0 (1000 mojos)" in captured.out
+    assert "CrunchBerries (Wallet ID: 3): 2.0 (2000 mojos)" in captured.out
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_print_offer_summary_hdd_and_cats(capsys: Any) -> None:
     summary_dict = {
-        "hdd": 2_500_000_000_000,
+        "xch": 2_500_000_000_000,
         TEST_DUCKSAUCE_ASSET_ID: 1_111,
         TEST_CRUNCHBERRIES_ASSET_ID: 2_222,
         TEST_UNICORNTEARS_ASSET_ID: 3_333,
@@ -75,16 +75,16 @@ async def test_print_offer_summary_hdd_and_cats(capsys: Any) -> None:
 
     captured = capsys.readouterr()
 
-    assert "HDD (Wallet ID: 1): 2.5 (2500000000000 bytes)" in captured.out
-    assert "DuckSauce (Wallet ID: 2): 1.111 (1111 bytes)" in captured.out
-    assert "CrunchBerries (Wallet ID: 3): 2.222 (2222 bytes)" in captured.out
-    assert "UnicornTears (Wallet ID: 4): 3.333 (3333 bytes)" in captured.out
+    assert "HDD (Wallet ID: 1): 2.5 (2500000000000 mojos)" in captured.out
+    assert "DuckSauce (Wallet ID: 2): 1.111 (1111 mojos)" in captured.out
+    assert "CrunchBerries (Wallet ID: 3): 2.222 (2222 mojos)" in captured.out
+    assert "UnicornTears (Wallet ID: 4): 3.333 (3333 mojos)" in captured.out
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_print_offer_summary_hdd_and_cats_with_zero_values(capsys: Any) -> None:
     summary_dict = {
-        "hdd": 0,
+        "xch": 0,
         TEST_DUCKSAUCE_ASSET_ID: 0,
         TEST_CRUNCHBERRIES_ASSET_ID: 0,
         TEST_UNICORNTEARS_ASSET_ID: 0,
@@ -94,13 +94,13 @@ async def test_print_offer_summary_hdd_and_cats_with_zero_values(capsys: Any) ->
 
     captured = capsys.readouterr()
 
-    assert "HDD (Wallet ID: 1): 0.0 (0 bytes)" in captured.out
-    assert "DuckSauce (Wallet ID: 2): 0.0 (0 bytes)" in captured.out
-    assert "CrunchBerries (Wallet ID: 3): 0.0 (0 bytes)" in captured.out
-    assert "UnicornTears (Wallet ID: 4): 0.0 (0 bytes)" in captured.out
+    assert "HDD (Wallet ID: 1): 0.0 (0 mojos)" in captured.out
+    assert "DuckSauce (Wallet ID: 2): 0.0 (0 mojos)" in captured.out
+    assert "CrunchBerries (Wallet ID: 3): 0.0 (0 mojos)" in captured.out
+    assert "UnicornTears (Wallet ID: 4): 0.0 (0 mojos)" in captured.out
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_print_offer_summary_cat_with_fee_and_change(capsys: Any) -> None:
     summary_dict = {
         TEST_DUCKSAUCE_ASSET_ID: 1_000,
@@ -111,16 +111,16 @@ async def test_print_offer_summary_cat_with_fee_and_change(capsys: Any) -> None:
 
     captured = capsys.readouterr()
 
-    assert "DuckSauce (Wallet ID: 2): 1.0 (1000 bytes)" in captured.out
+    assert "DuckSauce (Wallet ID: 2): 1.0 (1000 mojos)" in captured.out
     assert "Unknown: 3456 bytes  [Typically represents change returned from the included fee]" in captured.out
 
 
-@pytest.mark.asyncio
-async def test_print_offer_summary_hdd_with_one_byte(capsys: Any) -> None:
-    summary_dict = {"hdd": 1}
+@pytest.mark.anyio
+async def test_print_offer_summary_hdd_with_one_mojo(capsys: Any) -> None:
+    summary_dict = {"xch": 1}
 
     await print_offer_summary(cat_name_resolver, summary_dict)
 
     captured = capsys.readouterr()
 
-    assert "HDD (Wallet ID: 1): 1e-12 (1 byte)" in captured.out
+    assert "HDD (Wallet ID: 1): 1e-12 (1 mojo)" in captured.out

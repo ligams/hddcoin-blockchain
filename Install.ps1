@@ -2,6 +2,8 @@ param(
     [Parameter(HelpMessage="install development dependencies")]
     [switch]$d = $False,
     [Parameter()]
+    [switch]$i = $False,
+    [Parameter()]
     [switch]$p = $False
 )
 
@@ -11,6 +13,12 @@ $extras = @()
 if ($d)
 {
     $extras += "dev"
+}
+
+$editable_cli = "--editable"
+if ($i)
+{
+    $editable_cli = ""
 }
 
 if ([Environment]::Is64BitOperatingSystem -eq $false)
@@ -45,7 +53,7 @@ if ($null -eq (Get-Command py -ErrorAction SilentlyContinue))
     Exit 1
 }
 
-$supportedPythonVersions = "3.11", "3.10", "3.9", "3.8", "3.7"
+$supportedPythonVersions = "3.11", "3.10", "3.9", "3.8"
 if ("$env:INSTALL_PYTHON_VERSION" -ne "")
 {
     $pythonVersion = $env:INSTALL_PYTHON_VERSION

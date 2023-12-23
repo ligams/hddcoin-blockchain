@@ -5,12 +5,12 @@ import inspect
 import sys
 import threading
 
-from hddcoin.server.hddcoin_policy import HDDcoinSelectorEventLoop, PausableServer, _hddcoin_create_server, set_hddcoin_policy
+from hddcoin.server.hddcoin_policy import ChiaSelectorEventLoop, PausableServer, _hddcoin_create_server, set_hddcoin_policy
 
 
 def test_base_event_loop_has_methods() -> None:
     """
-    `HDDcoinPolicy` overrides `create_server` to create and return the custom `PausableServer`
+    `ChiaPolicy` overrides `create_server` to create and return the custom `PausableServer`
     instead of its base class `asyncio.base_events.Server`.
 
     This method checks asyncio's `create_server` and the constructor of asyncio's `base_events.Server`
@@ -23,9 +23,9 @@ def test_base_event_loop_has_methods() -> None:
     that their signature remains constant: `__init__`, `_attach`, `_detach`, `remove_reader` and `_start_serving`.
     """
 
-    selector_event_loop = HDDcoinSelectorEventLoop()
+    selector_event_loop = ChiaSelectorEventLoop()
     try:
-        base_selector_event_loop = super(HDDcoinSelectorEventLoop, selector_event_loop)
+        base_selector_event_loop = super(ChiaSelectorEventLoop, selector_event_loop)
 
         assert hasattr(base_selector_event_loop, "create_server")
         method = getattr(base_selector_event_loop, "create_server")

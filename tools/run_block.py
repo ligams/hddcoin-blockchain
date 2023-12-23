@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-run_block: Convert an encoded FullBlock from the HDDcoin blockchain into a list of transactions
+run_block: Convert an encoded FullBlock from the HDDCoin blockchain into a list of transactions
 
 As input, takes a file containing a [FullBlock](../hddcoin/types/full_block.py) in json format
 
@@ -11,7 +11,7 @@ curl --insecure --cert $config_root/config/ssl/full_node/private_full_node.crt \
      -d '{ "header_hash": "'$hash'" }' -H "Content-Type: application/json" \
      -X POST https://localhost:$port/get_block
 
-$ca_root is the directory containing your current HDDcoin config files
+$ca_root is the directory containing your current HDDCoin config files
 $hash is the header_hash of the [BlockRecord](../hddcoin/consensus/block_record.py)
 $port is the Full Node RPC API port
 ```
@@ -43,7 +43,6 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import click
-from clvm.casts import int_from_bytes
 
 from hddcoin.consensus.constants import ConsensusConstants
 from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
@@ -104,7 +103,7 @@ def npc_to_dict(npc: NPC):
 
 def run_generator(block_generator: BlockGenerator, constants: ConsensusConstants, max_cost: int) -> List[CAT]:
     block_args = [bytes(a) for a in block_generator.generator_refs]
-    cost, block_result = block_generator.program.run_with_cost(max_cost, DESERIALIZE_MOD, block_args)
+    cost, block_result = block_generator.program.run_with_cost(max_cost, [DESERIALIZE_MOD, block_args])
 
     coin_spends = block_result.first()
 
@@ -134,7 +133,7 @@ def run_generator(block_generator: BlockGenerator, constants: ConsensusConstants
                 continue
 
             # If only 3 elements (opcode + 2 args), there is no memo, this is ph, amount
-            if type(condition[3]) != list:
+            if type(condition[3]) is not list:
                 # If it's not a list, it's not the correct format
                 conds[op].append(ConditionWithArgs(op, [i for i in condition[1:3]]))
                 continue
@@ -156,7 +155,7 @@ def run_generator(block_generator: BlockGenerator, constants: ConsensusConstants
             break
 
         puzzle_hash = puzzle.get_tree_hash()
-        coin = Coin(parent.atom, puzzle_hash, int_from_bytes(amount.atom))
+        coin = Coin(bytes32(parent.as_atom()), puzzle_hash, amount.as_int())
         cat_list.append(
             CAT(
                 asset_id=bytes(asset_id).hex()[2:],

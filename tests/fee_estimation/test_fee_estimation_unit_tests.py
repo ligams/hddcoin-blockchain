@@ -79,7 +79,7 @@ def test_steady_fee_pressure() -> None:
         est2 = estimator.estimate_fee_rate(time_offset_seconds=seconds)
         e.append(est2)
 
-    # assert est == FeeRate.create(Bytes(fee), CLVMCost(cost)) #TODO
+    # assert est == FeeRate.create (Bytes(fee), CLVMCost(cost)) #TODO
     estimates_after = [estimator.estimate_fee_rate(time_offset_seconds=40 * height) for height in range(start, end)]
     block_estimates = [estimator.estimate_fee_rate_for_block(uint32(h)) for h in range(start, end)]
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from hddcoin.wallet.chialisp import (
+from hddcoin.wallet.hddcoinlisp import (
     apply,
     args,
     cons,

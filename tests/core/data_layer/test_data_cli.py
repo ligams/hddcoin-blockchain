@@ -5,13 +5,13 @@ from typing import Dict, List
 
 import pytest
 
-from tests.core.data_layer.util import HDDcoinRoot
+from tests.core.data_layer.util import ChiaRoot
 
 pytestmark = pytest.mark.data_layer
 
 
-@pytest.mark.asyncio
-async def test_help(hddcoin_root: HDDcoinRoot) -> None:
+@pytest.mark.anyio
+async def test_help(hddcoin_root: ChiaRoot) -> None:
     """Just a trivial test to make sure the subprocessing is at least working and the
     data executable does run.
     """
@@ -19,9 +19,9 @@ async def test_help(hddcoin_root: HDDcoinRoot) -> None:
     assert "Show this message and exit" in completed_process.stdout
 
 
-@pytest.mark.xfail(strict=True)
-@pytest.mark.asyncio
-def test_round_trip(hddcoin_root: HDDcoinRoot, hddcoin_daemon: None, hddcoin_data: None) -> None:
+@pytest.mark.skip
+@pytest.mark.anyio
+def test_round_trip(hddcoin_root: ChiaRoot, hddcoin_daemon: None, hddcoin_data: None) -> None:
     """Create a table, insert a row, get the row by its hash."""
 
     with hddcoin_root.print_log_after():

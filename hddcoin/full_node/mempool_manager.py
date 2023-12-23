@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from multiprocessing.context import BaseContext
 from typing import Awaitable, Callable, Dict, List, Optional, Set, Tuple, TypeVar
 
-from blspy import GTElement
-from chia_rs import ELIGIBLE_FOR_DEDUP
+from chia_rs import ELIGIBLE_FOR_DEDUP, GTElement
 from chiabip158 import PyBIP158
 
 from hddcoin.consensus.block_record import BlockRecordProtocol
@@ -96,6 +95,7 @@ def validate_clvm_and_signature(
 @dataclass
 class TimelockConditions:
     assert_height: uint32 = uint32(0)
+    assert_seconds: uint64 = uint64(0)
     assert_before_height: Optional[uint32] = None
     assert_before_seconds: Optional[uint64] = None
 
@@ -112,6 +112,7 @@ def compute_assert_height(
 
     ret = TimelockConditions()
     ret.assert_height = uint32(conds.height_absolute)
+    ret.assert_seconds = uint64(conds.seconds_absolute)
     ret.assert_before_height = (
         uint32(conds.before_height_absolute) if conds.before_height_absolute is not None else None
     )
@@ -123,6 +124,10 @@ def compute_assert_height(
         if spend.height_relative is not None:
             h = uint32(removal_coin_records[bytes32(spend.coin_id)].confirmed_block_index + spend.height_relative)
             ret.assert_height = max(ret.assert_height, h)
+
+        if spend.seconds_relative is not None:
+            s = uint64(removal_coin_records[bytes32(spend.coin_id)].timestamp + spend.seconds_relative)
+            ret.assert_seconds = max(ret.assert_seconds, s)
 
         if spend.before_height_relative is not None:
             h = uint32(
@@ -245,11 +250,12 @@ class MempoolManager:
         if cost == 0:
             return False
         fees_per_cost = fees / cost
-        if not self.mempool.at_full_capacity(cost) or (
-            fees_per_cost >= self.nonzero_fee_minimum_fpc and fees_per_cost > self.mempool.get_min_fee_rate(cost)
-        ):
+        if not self.mempool.at_full_capacity(cost):
             return True
-        return False
+        if fees_per_cost < self.nonzero_fee_minimum_fpc:
+            return False
+        min_fee_rate = self.mempool.get_min_fee_rate(cost)
+        return min_fee_rate is not None and fees_per_cost > min_fee_rate
 
     def add_and_maybe_pop_seen(self, spend_name: bytes32) -> None:
         self.seen_bundle_hashes[spend_name] = spend_name
@@ -466,8 +472,12 @@ class MempoolManager:
         if self.mempool.at_full_capacity(cost):
             if fees_per_cost < self.nonzero_fee_minimum_fpc:
                 return Err.INVALID_FEE_TOO_CLOSE_TO_ZERO, None, []
-            if fees_per_cost <= self.mempool.get_min_fee_rate(cost):
+            min_fee_rate = self.mempool.get_min_fee_rate(cost)
+            if min_fee_rate is None:
+                return Err.INVALID_COST_RESULT, None, []
+            if fees_per_cost <= min_fee_rate:
                 return Err.INVALID_FEE_LOW_FEE, None, []
+
         # Check removals against UnspentDB + DiffStore + Mempool + SpendBundle
         # Use this information later when constructing a block
         fail_reason, conflicts = self.check_removals(non_eligible_coin_ids, removal_record_dict)
@@ -499,6 +509,13 @@ class MempoolManager:
         )
 
         timelocks: TimelockConditions = compute_assert_height(removal_record_dict, npc_result.conds)
+
+        if timelocks.assert_before_height is not None and timelocks.assert_before_height <= timelocks.assert_height:
+            # returning None as the "potential" means it failed. We won't store it
+            # in the pending cache
+            return Err.IMPOSSIBLE_HEIGHT_ABSOLUTE_CONSTRAINTS, None, []  # MempoolInclusionStatus.FAILED
+        if timelocks.assert_before_seconds is not None and timelocks.assert_before_seconds <= timelocks.assert_seconds:
+            return Err.IMPOSSIBLE_SECONDS_ABSOLUTE_CONSTRAINTS, None, []  # MempoolInclusionStatus.FAILED
 
         potential = MempoolItem(
             new_spend,
@@ -579,7 +596,7 @@ class MempoolManager:
         return item
 
     async def new_peak(
-        self, new_peak: Optional[BlockRecordProtocol], last_npc_result: Optional[NPCResult]
+        self, new_peak: Optional[BlockRecordProtocol], spent_coins: Optional[List[bytes32]]
     ) -> List[Tuple[SpendBundle, NPCResult, bytes32]]:
         """
         Called when a new peak is available, we try to recreate a mempool for the new tip.
@@ -600,22 +617,27 @@ class MempoolManager:
         use_optimization: bool = self.peak is not None and new_peak.prev_transaction_block_hash == self.peak.header_hash
         self.peak = new_peak
 
-        if use_optimization and last_npc_result is not None:
+        if use_optimization and spent_coins is not None:
             # We don't reinitialize a mempool, just kick removed items
-            if last_npc_result.conds is not None:
-                # transactions in the mempool may be spending multiple coins,
-                # when looking up transactions by all coin IDs, we're likely to
-                # find the same transaction multiple times. We put them in a set
-                # to deduplicate
-                spendbundle_ids_to_remove: Set[bytes32] = set()
-                for spend in last_npc_result.conds.spends:
-                    items: List[MempoolItem] = self.mempool.get_items_by_coin_id(bytes32(spend.coin_id))
-                    for item in items:
-                        included_items.append(MempoolItemInfo(item.cost, item.fee, item.height_added_to_mempool))
-                        self.remove_seen(item.name)
-                        spendbundle_ids_to_remove.add(item.name)
-                self.mempool.remove_from_pool(list(spendbundle_ids_to_remove), MempoolRemoveReason.BLOCK_INCLUSION)
+            # transactions in the mempool may be spending multiple coins,
+            # when looking up transactions by all coin IDs, we're likely to
+            # find the same transaction multiple times. We put them in a set
+            # to deduplicate
+            spendbundle_ids_to_remove: Set[bytes32] = set()
+            for spend in spent_coins:
+                items: List[MempoolItem] = self.mempool.get_items_by_coin_id(spend)
+                for item in items:
+                    included_items.append(MempoolItemInfo(item.cost, item.fee, item.height_added_to_mempool))
+                    self.remove_seen(item.name)
+                    spendbundle_ids_to_remove.add(item.name)
+            self.mempool.remove_from_pool(list(spendbundle_ids_to_remove), MempoolRemoveReason.BLOCK_INCLUSION)
         else:
+            log.warning(
+                "updating the mempool using the slow-path. "
+                f"peak: {self.peak.header_hash} "
+                f"new-peak-prev: {new_peak.prev_transaction_block_hash} "
+                f"coins: {'not set' if spent_coins is None else 'set'}"
+            )
             old_pool = self.mempool
             self.mempool = Mempool(old_pool.mempool_info, old_pool.fee_estimator)
             self.seen_bundle_hashes = {}

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import random
 import time
-from secrets import token_bytes
 
-from blspy import AugSchemeMPL, PrivateKey
+from chia_rs import AugSchemeMPL, PrivateKey
 from clvm_tools import binutils
 
 from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.simulator.wallet_tools import WalletTool
 from hddcoin.types.blockchain_format.program import INFINITE_COST, Program
+from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.condition_opcodes import ConditionOpcode
 from hddcoin.types.condition_with_args import ConditionWithArgs
 from hddcoin.util.ints import uint32
@@ -25,20 +26,20 @@ def float_to_str(f):
         zero_padding = "0" * (abs(int(exp)) - 1)  # minus 1 for decimal point in the sci notation
         sign = "-" if f < 0 else ""
         if exp > 0:
-            float_string = "{}{}{}.0".format(sign, digits, zero_padding)
+            float_string = f"{sign}{digits}{zero_padding}.0"
         else:
-            float_string = "{}0.{}{}".format(sign, zero_padding, digits)
+            float_string = f"{sign}0.{zero_padding}{digits}"
     return float_string
 
 
-def run_and_return_cost_time(chialisp):
+def run_and_return_cost_time(hddcoinlisp):
     start = time.time()
     clvm_loop = "((c (q ((c (f (a)) (c (f (a)) (c (f (r (a))) (c (f (r (r (a))))"
     " (q ()))))))) (c (q ((c (i (f (r (a))) (q (i (q 1) ((c (f (a)) (c (f (a))"
     " (c (- (f (r (a))) (q 1)) (c (f (r (r (a)))) (q ()))))))"
     " ((c (f (r (r (a)))) (q ()))))) (q (q ()))) (a)))) (a))))"
     loop_program = Program.to(binutils.assemble(clvm_loop))
-    clvm_loop_solution = f"(1000 {chialisp})"
+    clvm_loop_solution = f"(1000 {hddcoinlisp})"
     solution_program = Program.to(binutils.assemble(clvm_loop_solution))
 
     cost, sexp = loop_program.run_with_cost(solution_program, INFINITE_COST)
@@ -111,11 +112,18 @@ if __name__ == "__main__":
     private_keys = []
     public_keys = []
 
+    seeded_random = random.Random()
+    seeded_random.seed(a=0, version=2)
+
     for i in range(0, 1000):
         private_key: PrivateKey = master_sk_to_wallet_sk(secret_key, uint32(i))
-        public_key = private_key.public_key()
+        public_key = private_key.get_g1()
         solution = wallet_tool.make_solution(
-            {ConditionOpcode.ASSERT_MY_COIN_ID: [ConditionWithArgs(ConditionOpcode.ASSERT_MY_COIN_ID, [token_bytes()])]}
+            {
+                ConditionOpcode.ASSERT_MY_COIN_ID: [
+                    ConditionWithArgs(ConditionOpcode.ASSERT_MY_COIN_ID, [bytes32.random(seeded_random)])
+                ]
+            }
         )
         puzzle = puzzle_for_pk(bytes(public_key))
         puzzles.append(puzzle)
@@ -137,7 +145,7 @@ if __name__ == "__main__":
 
     private_key = master_sk_to_wallet_sk(secret_key, uint32(0))
     public_key = private_key.get_g1()
-    message = token_bytes()
+    message = bytes32.random(seeded_random)
     signature = AugSchemeMPL.sign(private_key, message)
     pk_message_pair = (public_key, message)
 

@@ -6,21 +6,24 @@ from clvm_tools import binutils
 from clvm_tools.clvmc import compile_clvm_text
 
 from hddcoin.consensus.condition_costs import ConditionCost
+from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
 from hddcoin.full_node.mempool_check_conditions import get_name_puzzle_conditions
 from hddcoin.types.blockchain_format.program import Program
 from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
 from hddcoin.types.generator_types import BlockGenerator
-from hddcoin.types.spend_bundle_conditions import ELIGIBLE_FOR_DEDUP, Spend
+from hddcoin.types.spend_bundle_conditions import Spend
 from hddcoin.util.ints import uint32
-from hddcoin.wallet.puzzles.load_clvm import load_clvm
-from hddcoin.wallet.puzzles.rom_bootstrap_generator import GENERATOR_MOD
+from hddcoin.wallet.puzzles.load_clvm import load_clvm, load_serialized_clvm_maybe_recompile
 
 MAX_COST = int(1e15)
 COST_PER_BYTE = int(12000)
 
 
-DESERIALIZE_MOD = load_clvm("chialisp_deserialisation.clsp", package_or_requirement="hddcoin.wallet.puzzles")
+DESERIALIZE_MOD = load_clvm("hddcoinlisp_deserialisation.clsp", package_or_requirement="hddcoin.consensus.puzzles")
+GENERATOR_MOD: SerializedProgram = load_serialized_clvm_maybe_recompile(
+    "rom_bootstrap_generator.clsp", package_or_requirement="hddcoin.consensus.puzzles"
+)
 
 
 GENERATOR_CODE = """
@@ -65,7 +68,8 @@ def block_generator() -> BlockGenerator:
 
 
 EXPECTED_ABBREVIATED_COST = 108379
-EXPECTED_COST = 113415
+EXPECTED_COST1 = 113415
+EXPECTED_COST2 = 108423
 EXPECTED_OUTPUT = (
     "ffffffa00000000000000000000000000000000000000000000000000000000000000000"
     "ff01ff8300c350ffffff33ffa00000000000000000000000000000000000000000000000"
@@ -77,7 +81,7 @@ EXPECTED_OUTPUT = (
 def run_generator(self: BlockGenerator) -> Tuple[int, Program]:
     """This mode is meant for accepting possibly soft-forked transactions into the mempool"""
     args = Program.to([[bytes(g) for g in self.generator_refs]])
-    return GENERATOR_MOD.run_with_cost(MAX_COST, self.program, args)
+    return GENERATOR_MOD.run_with_cost(MAX_COST, [self.program, args])
 
 
 def as_atom_list(prg: Program) -> List[bytes]:
@@ -122,17 +126,21 @@ class TestROM:
         print(r)
 
         npc_result = get_name_puzzle_conditions(
-            gen, max_cost=MAX_COST, mempool_mode=False, height=uint32(softfork_height)
+            gen, max_cost=MAX_COST, mempool_mode=False, height=uint32(softfork_height), constants=DEFAULT_CONSTANTS
         )
+        if softfork_height >= DEFAULT_CONSTANTS.HARD_FORK_HEIGHT:
+            cost = EXPECTED_COST2
+        else:
+            cost = EXPECTED_COST1
         assert npc_result.error is None
-        assert npc_result.cost == EXPECTED_COST + ConditionCost.CREATE_COIN.value + (
-            len(bytes(gen.program)) * COST_PER_BYTE
-        )
+        assert npc_result.cost == cost + ConditionCost.CREATE_COIN.value + (len(bytes(gen.program)) * COST_PER_BYTE)
         assert npc_result.conds is not None
 
         spend = Spend(
             coin_id=bytes32.fromhex("e8538c2d14f2a7defae65c5c97f5d4fae7ee64acef7fec9d28ad847a0880fd03"),
+            parent_id=bytes32.fromhex("0000000000000000000000000000000000000000000000000000000000000000"),
             puzzle_hash=bytes32.fromhex("9dcf97a184f32623d11a73124ceb99a5709b083721e878a16d78f596718ba7b2"),
+            coin_amount=50000,
             height_relative=None,
             seconds_relative=None,
             before_height_relative=None,
@@ -141,7 +149,13 @@ class TestROM:
             birth_seconds=None,
             create_coin=[(bytes([0] * 31 + [1]), 500, None)],
             agg_sig_me=[],
-            flags=ELIGIBLE_FOR_DEDUP,
+            agg_sig_parent=[],
+            agg_sig_puzzle=[],
+            agg_sig_amount=[],
+            agg_sig_puzzle_amount=[],
+            agg_sig_parent_amount=[],
+            agg_sig_parent_puzzle=[],
+            flags=0,
         )
 
         assert npc_result.conds.spends == [spend]

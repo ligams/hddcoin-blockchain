@@ -3,20 +3,20 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 
 import pytest
-from blspy import G2Element
+from chia_rs import G2Element
 
 from hddcoin.clvm.spend_sim import CostLogger, sim_and_client
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import Program
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.types.coin_spend import CoinSpend
+from hddcoin.types.coin_spend import make_spend
 from hddcoin.types.mempool_inclusion_status import MempoolInclusionStatus
 from hddcoin.types.spend_bundle import SpendBundle
 from hddcoin.util.errors import Err
 from hddcoin.wallet.puzzles.load_clvm import load_clvm
 from hddcoin.wallet.util.merkle_utils import build_merkle_tree, build_merkle_tree_from_binary_tree, simplify_merkle_proof
 
-GRAFTROOT_MOD = load_clvm("graftroot_dl_offers.clsp")
+GRAFTROOT_MOD = load_clvm("graftroot_dl_offers.clsp", package_or_requirement="hddcoin.data_layer.puzzles")
 
 # Always returns the last value
 # (mod solution
@@ -38,7 +38,7 @@ ACS_PH = ACS.get_tree_hash()
 NIL_PH = Program.to(None).get_tree_hash()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_graftroot(cost_logger: CostLogger) -> None:
     async with sim_and_client() as (sim, sim_client):
         # Create the coin we're testing
@@ -84,7 +84,7 @@ async def test_graftroot(cost_logger: CostLogger) -> None:
             fake_coin: Coin = (await sim_client.get_coin_records_by_puzzle_hash(fake_puzzle.get_tree_hash()))[0].coin
 
             # Create the spend
-            fake_spend = CoinSpend(
+            fake_spend = make_spend(
                 fake_coin,
                 fake_puzzle,
                 Program.to([[[62, "$"]]]),
@@ -97,7 +97,7 @@ async def test_graftroot(cost_logger: CostLogger) -> None:
                 else:
                     proofs_of_inclusion.append((0, []))
 
-            graftroot_spend = CoinSpend(
+            graftroot_spend = make_spend(
                 graftroot_coin,
                 graftroot_puzzle,
                 Program.to(
@@ -129,7 +129,7 @@ async def test_graftroot(cost_logger: CostLogger) -> None:
                 await sim.rewind(same_height)
 
                 # try with a bad merkle root announcement
-                new_fake_spend = CoinSpend(
+                new_fake_spend = make_spend(
                     fake_coin,
                     ACS.curry(fake_struct, ACS.curry(ACS_PH, (bytes32([0] * 32), None), None, None)),
                     Program.to([[[62, "$"]]]),

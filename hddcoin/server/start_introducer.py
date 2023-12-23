@@ -8,9 +8,11 @@ from hddcoin.introducer.introducer import Introducer
 from hddcoin.introducer.introducer_api import IntroducerAPI
 from hddcoin.server.outbound_message import NodeType
 from hddcoin.server.start_service import Service, async_run
+from hddcoin.types.aliases import IntroducerService
 from hddcoin.util.hddcoin_logging import initialize_service_logging
 from hddcoin.util.config import load_config, load_config_cli
 from hddcoin.util.default_root import DEFAULT_ROOT_PATH
+from hddcoin.util.misc import SignalHandlers
 
 # See: https://bugs.python.org/issue29288
 "".encode("idna")
@@ -23,7 +25,7 @@ def create_introducer_service(
     config: Dict[str, Any],
     advertised_port: Optional[int] = None,
     connect_to_daemon: bool = True,
-) -> Service[Introducer]:
+) -> IntroducerService:
     service_config = config[SERVICE_NAME]
 
     if advertised_port is None:
@@ -52,8 +54,9 @@ async def async_main() -> int:
     config[SERVICE_NAME] = service_config
     service = create_introducer_service(DEFAULT_ROOT_PATH, config)
     initialize_service_logging(service_name=SERVICE_NAME, config=config)
-    await service.setup_process_global_state()
-    await service.run()
+    async with SignalHandlers.manage() as signal_handlers:
+        await service.setup_process_global_state(signal_handlers=signal_handlers)
+        await service.run()
 
     return 0
 

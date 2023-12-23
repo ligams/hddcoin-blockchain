@@ -23,13 +23,11 @@ class WalletUserStore:
         self.db_wrapper = db_wrapper
         async with self.db_wrapper.writer_maybe_transaction() as conn:
             await conn.execute(
-                (
-                    "CREATE TABLE IF NOT EXISTS users_wallets("
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    " name text,"
-                    " wallet_type int,"
-                    " data text)"
-                )
+                "CREATE TABLE IF NOT EXISTS users_wallets("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                " name text,"
+                " wallet_type int,"
+                " data text)"
             )
 
             await conn.execute("CREATE INDEX IF NOT EXISTS name on users_wallets(name)")
@@ -44,7 +42,7 @@ class WalletUserStore:
     async def init_wallet(self):
         all_wallets = await self.get_all_wallet_info_entries()
         if len(all_wallets) == 0:
-            await self.create_wallet("HDDcoin Wallet", WalletType.STANDARD_WALLET, "")
+            await self.create_wallet("Chia Wallet", WalletType.STANDARD_WALLET, "")
 
     async def create_wallet(
         self,

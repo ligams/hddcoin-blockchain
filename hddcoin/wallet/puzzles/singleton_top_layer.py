@@ -5,7 +5,7 @@ from typing import Iterator, List, Optional, Tuple
 from hddcoin.types.blockchain_format.coin import Coin
 from hddcoin.types.blockchain_format.program import Program
 from hddcoin.types.blockchain_format.sized_bytes import bytes32
-from hddcoin.types.coin_spend import CoinSpend
+from hddcoin.types.coin_spend import CoinSpend, make_spend
 from hddcoin.types.condition_opcodes import ConditionOpcode
 from hddcoin.util.hash import std_hash
 from hddcoin.util.ints import uint64
@@ -196,7 +196,7 @@ def launch_conditions_and_coinsol(
     amount: uint64,
 ) -> Tuple[List[Program], CoinSpend]:
     if (amount % 2) == 0:
-        raise ValueError("Coin amount cannot be even. Subtract one byte.")
+        raise ValueError("Coin amount cannot be even. Subtract one mojo.")
 
     launcher_coin: Coin = generate_launcher_coin(coin, amount)
     curried_singleton: Program = SINGLETON_MOD.curry(
@@ -227,7 +227,7 @@ def launch_conditions_and_coinsol(
 
     conditions = [create_launcher, assert_launcher_announcement]
 
-    launcher_coin_spend = CoinSpend(
+    launcher_coin_spend = make_spend(
         launcher_coin,
         SINGLETON_LAUNCHER,
         launcher_solution,
@@ -333,7 +333,7 @@ def claim_p2_singleton(
             delay_time,
             delay_ph,
         )
-    claim_coinsol = CoinSpend(
+    claim_coinsol = make_spend(
         p2_singleton_coin,
         puzzle,
         solution_for_p2_singleton(p2_singleton_coin, singleton_inner_puzhash),
@@ -349,7 +349,7 @@ def spend_to_delayed_puzzle(
     delay_time: uint64,
     delay_ph: bytes32,
 ) -> CoinSpend:
-    claim_coinsol = CoinSpend(
+    claim_coinsol = make_spend(
         p2_singleton_coin,
         pay_to_singleton_or_delay_puzzle(launcher_id, delay_time, delay_ph),
         solution_for_p2_delayed_puzzle(output_amount),

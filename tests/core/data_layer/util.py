@@ -6,7 +6,7 @@ import os
 import pathlib
 import subprocess
 from dataclasses import dataclass
-from typing import IO, TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
+from typing import IO, TYPE_CHECKING, Any, Dict, Iterator, List, Literal, Optional, Union, overload
 
 from hddcoin.data_layer.data_layer_util import NodeType, Side, Status
 from hddcoin.data_layer.data_store import DataStore
@@ -34,7 +34,7 @@ async def general_insert(
     reference_node_hash: bytes32,
     side: Optional[Side],
 ) -> bytes32:
-    return await data_store.insert(
+    insert_result = await data_store.insert(
         key=key,
         value=value,
         tree_id=tree_id,
@@ -42,6 +42,7 @@ async def general_insert(
         side=side,
         status=Status.COMMITTED,
     )
+    return insert_result.node_hash
 
 
 @dataclass(frozen=True)
@@ -117,7 +118,7 @@ async def add_01234567_example(data_store: DataStore, tree_id: bytes32) -> Examp
 
 
 @dataclass
-class HDDcoinRoot:
+class ChiaRoot:
     path: pathlib.Path
     scripts_path: pathlib.Path
 
@@ -133,8 +134,8 @@ class HDDcoinRoot:
     ) -> subprocess_CompletedProcess_str:
         # TODO: --root-path doesn't seem to work here...
         kwargs.setdefault("env", {})
-        kwargs["env"]["HDDCOIN_ROOT"] = os.fspath(self.path)
-        kwargs["env"]["HDDCOIN_KEYS_ROOT"] = os.fspath(self.path)
+        kwargs["env"]["CHIA_ROOT"] = os.fspath(self.path)
+        kwargs["env"]["CHIA_KEYS_ROOT"] = os.fspath(self.path)
 
         # This is for windows
         if "SYSTEMROOT" in os.environ:
@@ -182,12 +183,30 @@ class HDDcoinRoot:
             self.print_log()
 
 
+@overload
+def create_valid_node_values(
+    node_type: Literal[NodeType.INTERNAL],
+    left_hash: bytes32,
+    right_hash: bytes32,
+) -> Dict[str, Any]:
+    ...
+
+
+@overload
+def create_valid_node_values(
+    node_type: Literal[NodeType.TERMINAL],
+) -> Dict[str, Any]:
+    ...
+
+
 def create_valid_node_values(
     node_type: NodeType,
     left_hash: Optional[bytes32] = None,
     right_hash: Optional[bytes32] = None,
 ) -> Dict[str, Any]:
     if node_type == NodeType.INTERNAL:
+        assert left_hash is not None
+        assert right_hash is not None
         return {
             "hash": Program.to((left_hash, right_hash)).get_tree_hash_precalc(left_hash, right_hash),
             "node_type": node_type,
@@ -197,6 +216,7 @@ def create_valid_node_values(
             "value": None,
         }
     elif node_type == NodeType.TERMINAL:
+        assert left_hash is None and right_hash is None
         key = b""
         value = b""
         return {
@@ -208,4 +228,4 @@ def create_valid_node_values(
             "value": value,
         }
 
-    raise Exception(f"Unhandled node type: {node_type!r}")
+    raise Exception(f"Unhandled node type: {node_type!r}")  # pragma: no cover

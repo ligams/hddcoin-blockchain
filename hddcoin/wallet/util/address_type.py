@@ -8,7 +8,7 @@ from hddcoin.util.config import selected_network_address_prefix
 
 
 class AddressType(Enum):
-    HDD = "hdd"
+    HDD = "xch"
     NFT = "nft"
     DID = "did:hddcoin:"
 
@@ -16,7 +16,7 @@ class AddressType(Enum):
         if self == AddressType.HDD:
             # Special case to map HDD to the current network's address prefix
             return selected_network_address_prefix(config)
-        return self.value
+        return str(self.value)
 
     def expected_decoded_length(self) -> int:
         # Current address types encode 32 bytes. If future address types vary in

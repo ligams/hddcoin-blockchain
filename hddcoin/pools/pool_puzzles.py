@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Tuple
 
-from blspy import G1Element
+from chia_rs import G1Element
 from clvm.casts import int_from_bytes, int_to_bytes
 
 from hddcoin.clvm.singleton import SINGLETON_LAUNCHER
@@ -22,8 +22,10 @@ from hddcoin.wallet.puzzles.singleton_top_layer import puzzle_for_singleton
 log = logging.getLogger(__name__)
 # "Full" is the outer singleton, with the inner puzzle filled in
 SINGLETON_MOD = load_clvm_maybe_recompile("singleton_top_layer.clsp")
-POOL_WAITING_ROOM_MOD = load_clvm_maybe_recompile("pool_waitingroom_innerpuz.clsp")
-POOL_MEMBER_MOD = load_clvm_maybe_recompile("pool_member_innerpuz.clsp")
+POOL_WAITING_ROOM_MOD = load_clvm_maybe_recompile(
+    "pool_waitingroom_innerpuz.clsp", package_or_requirement="hddcoin.pools.puzzles"
+)
+POOL_MEMBER_MOD = load_clvm_maybe_recompile("pool_member_innerpuz.clsp", package_or_requirement="hddcoin.pools.puzzles")
 P2_SINGLETON_MOD = load_clvm_maybe_recompile("p2_singleton_or_delayed_puzhash.clsp")
 POOL_OUTER_MOD = SINGLETON_MOD
 
@@ -114,7 +116,7 @@ def get_delayed_puz_info_from_launcher_spend(coinsol: CoinSpend) -> Tuple[uint64
 ######################################
 
 
-def get_template_singleton_inner_puzzle(inner_puzzle: Program):
+def get_template_singleton_inner_puzzle(inner_puzzle: Program) -> Program:
     r = inner_puzzle.uncurry()
     if r is None:
         return False
@@ -307,7 +309,9 @@ def get_pubkey_from_member_inner_puzzle(inner_puzzle: Program) -> G1Element:
     return pubkey
 
 
-def uncurry_pool_member_inner_puzzle(inner_puzzle: Program):  # -> Optional[Tuple[Program, Program, Program]]:
+def uncurry_pool_member_inner_puzzle(
+    inner_puzzle: Program,
+) -> Tuple[Program, Program, Program, Program, Program, Program]:
     """
     Take a puzzle and return `None` if it's not a "pool member" inner puzzle, or
     a triple of `mod_hash, relative_lock_height, pubkey` if it is.
@@ -350,7 +354,10 @@ def get_inner_puzzle_from_puzzle(full_puzzle: Program) -> Optional[Program]:
     _, inner_puzzle = list(args.as_iter())
     if not is_pool_singleton_inner_puzzle(inner_puzzle):
         return None
-    return inner_puzzle
+    # ignoring hint error here for:
+    # https://github.com/Chia-Network/clvm/pull/102
+    # https://github.com/Chia-Network/clvm/pull/106
+    return inner_puzzle  # type: ignore[no-any-return]
 
 
 def pool_state_from_extra_data(extra_data: Program) -> Optional[PoolState]:
@@ -389,7 +396,7 @@ def solution_to_pool_state(full_spend: CoinSpend) -> Optional[PoolState]:
         if inner_solution.rest().first().as_int() != 0:
             return None
 
-        # This is referred to as p1 in the chialisp code
+        # This is referred to as p1 in the hddcoinlisp code
         # spend_type is absorbing money if p1 is a cons box, spend_type is escape if p1 is an atom
         # TODO: The comment above, and in the CLVM, seems wrong
         extra_data = inner_solution.first()
@@ -417,7 +424,7 @@ def pool_state_to_inner_puzzle(
         delay_time,
         delay_ph,
     )
-    if pool_state.state in [LEAVING_POOL, SELF_POOLING]:
+    if pool_state.state in [LEAVING_POOL.value, SELF_POOLING.value]:
         return escaping_inner_puzzle
     else:
         return create_pooling_inner_puzzle(

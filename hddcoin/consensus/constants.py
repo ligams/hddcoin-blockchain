@@ -78,10 +78,7 @@ class ConsensusConstants:
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
 
-    def replace(self, **changes: object) -> "ConsensusConstants":
-        return dataclasses.replace(self, **changes)
-
-    def replace_str_to_bytes(self, **changes: Any) -> "ConsensusConstants":
+    def replace_str_to_bytes(self, **changes: Any) -> ConsensusConstants:
         """
         Overrides str (hex) values with bytes.
         """
@@ -98,4 +95,5 @@ class ConsensusConstants:
             else:
                 filtered_changes[k] = v
 
-        return dataclasses.replace(self, **filtered_changes)
+        # TODO: this is too magical here and is really only used for configuration unmarshalling
+        return dataclasses.replace(self, **filtered_changes)  # type: ignore[arg-type]

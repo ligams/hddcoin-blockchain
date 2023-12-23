@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 
-from blspy import G2Element
+from chia_rs import G2Element
 from clvm_tools import binutils
 
 from hddcoin.consensus.block_rewards import calculate_base_farmer_reward, calculate_pool_reward
 from hddcoin.rpc.full_node_rpc_client import FullNodeRpcClient
 from hddcoin.types.blockchain_format.program import Program
+from hddcoin.types.blockchain_format.serialized_program import SerializedProgram
 from hddcoin.types.coin_spend import CoinSpend
 from hddcoin.types.condition_opcodes import ConditionOpcode
 from hddcoin.types.spend_bundle import SpendBundle
@@ -18,7 +19,7 @@ from hddcoin.util.default_root import DEFAULT_ROOT_PATH
 from hddcoin.util.ints import uint16, uint32
 
 
-def print_conditions(spend_bundle: SpendBundle):
+def print_conditions(spend_bundle: SpendBundle) -> None:
     print("\nConditions:")
     for coin_spend in spend_bundle.coin_spends:
         result = Program.from_bytes(bytes(coin_spend.puzzle_reveal)).run(Program.from_bytes(bytes(coin_spend.solution)))
@@ -28,7 +29,7 @@ def print_conditions(spend_bundle: SpendBundle):
 
 
 async def main() -> None:
-    rpc_port: uint16 = uint16(28555)
+    rpc_port: uint16 = uint16(8555)
     self_hostname = "localhost"
     path = DEFAULT_ROOT_PATH
     config = load_config(path, "config.yaml")
@@ -45,25 +46,29 @@ async def main() -> None:
         print(farmer_prefarm.amount, farmer_amounts)
         assert farmer_amounts == farmer_prefarm.amount // 2
         assert pool_amounts == pool_prefarm.amount // 2
-        address1 = "hdd1tm2fmappqenrj3c9ngej8k33pujvspxxea6zpu7p4sx0lvle62es9ae95j"  # HDDcoin Network Inc Reserves Account-1
-        address2 = "hdd1tm2fmappqenrj3c9ngej8k33pujvspxxea6zpu7p4sx0lvle62es9ae95j"  # HDDcoin Network Inc Reserves Account-1
+        address1 = "xch1rdatypul5c642jkeh4yp933zu3hw8vv8tfup8ta6zfampnyhjnusxdgns6"  # Key 1
+        address2 = "xch1duvy5ur5eyj7lp5geetfg84cj2d7xgpxt7pya3lr2y6ke3696w9qvda66e"  # Key 2
 
         ph1 = decode_puzzle_hash(address1)
         ph2 = decode_puzzle_hash(address2)
 
-        p_farmer_2 = Program.to(
-            binutils.assemble(f"(q . ((51 0x{ph1.hex()} {farmer_amounts}) (51 0x{ph2.hex()} {farmer_amounts})))")
+        p_farmer_2 = SerializedProgram.to(
+            binutils.assemble(
+                f"(q . ((51 0x{ph1.hex()} {farmer_amounts}) " f"(51 0x{ph2.hex()} {farmer_amounts})))"
+            )  # type: ignore[no-untyped-call]
         )
-        p_pool_2 = Program.to(
-            binutils.assemble(f"(q . ((51 0x{ph1.hex()} {pool_amounts}) (51 0x{ph2.hex()} {pool_amounts})))")
+        p_pool_2 = SerializedProgram.to(
+            binutils.assemble(
+                f"(q . ((51 0x{ph1.hex()} {pool_amounts}) " f"(51 0x{ph2.hex()} {pool_amounts})))"
+            )  # type: ignore[no-untyped-call]
         )
 
         print(f"Ph1: {ph1.hex()}")
         print(f"Ph2: {ph2.hex()}")
-        assert ph1.hex() == "5ed49df42106663947059a3323da310f24c804c6cf7420f3c1ac0cffb3f9d2b3"
-        assert ph2.hex() == "5ed49df42106663947059a3323da310f24c804c6cf7420f3c1ac0cffb3f9d2b3"
+        assert ph1.hex() == "1b7ab2079fa635554ad9bd4812c622e46ee3b1875a7813afba127bb0cc9794f9"
+        assert ph2.hex() == "6f184a7074c925ef8688ce56941eb8929be320265f824ec7e351356cc745d38a"
 
-        p_solution = Program.to(binutils.assemble("()"))
+        p_solution = SerializedProgram.to(binutils.assemble("()"))  # type: ignore[no-untyped-call]
 
         sb_farmer = SpendBundle([CoinSpend(farmer_prefarm, p_farmer_2, p_solution)], G2Element())
         sb_pool = SpendBundle([CoinSpend(pool_prefarm, p_pool_2, p_solution)], G2Element())

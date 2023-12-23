@@ -8,16 +8,18 @@ from multiprocessing import freeze_support
 from typing import Any, Dict, List, Optional, Tuple
 
 from hddcoin.consensus.constants import ConsensusConstants
-from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS
+from hddcoin.consensus.default_constants import DEFAULT_CONSTANTS, update_testnet_overrides
 from hddcoin.full_node.full_node import FullNode
 from hddcoin.full_node.full_node_api import FullNodeAPI
 from hddcoin.rpc.full_node_rpc_api import FullNodeRpcApi
 from hddcoin.server.outbound_message import NodeType
 from hddcoin.server.start_service import RpcInfo, Service, async_run
+from hddcoin.types.aliases import FullNodeService
 from hddcoin.util.hddcoin_logging import initialize_service_logging
 from hddcoin.util.config import load_config, load_config_cli
 from hddcoin.util.default_root import DEFAULT_ROOT_PATH
 from hddcoin.util.ints import uint16
+from hddcoin.util.misc import SignalHandlers
 from hddcoin.util.task_timing import maybe_manage_task_instrumentation
 
 # See: https://bugs.python.org/issue29288
@@ -27,16 +29,16 @@ SERVICE_NAME = "full_node"
 log = logging.getLogger(__name__)
 
 
-def create_full_node_service(
+async def create_full_node_service(
     root_path: pathlib.Path,
     config: Dict[str, Any],
     consensus_constants: ConsensusConstants,
     connect_to_daemon: bool = True,
     override_capabilities: Optional[List[Tuple[uint16, str]]] = None,
-) -> Service[FullNode]:
+) -> FullNodeService:
     service_config = config[SERVICE_NAME]
 
-    full_node = FullNode(
+    full_node = await FullNode.create(
         service_config,
         root_path=root_path,
         consensus_constants=consensus_constants,
@@ -47,7 +49,7 @@ def create_full_node_service(
     if service_config["enable_upnp"]:
         upnp_list = [service_config["port"]]
     network_id = service_config["selected_network"]
-    rpc_info: Optional[RpcInfo] = None
+    rpc_info: Optional[RpcInfo[FullNodeRpcApi]] = None
     if service_config["start_rpc_server"]:
         rpc_info = (FullNodeRpcApi, service_config["rpc_port"])
     return Service(
@@ -73,15 +75,13 @@ async def async_main(service_config: Dict[str, Any]) -> int:
     config[SERVICE_NAME] = service_config
     network_id = service_config["selected_network"]
     overrides = service_config["network_overrides"]["constants"][network_id]
-    if network_id == "testnet10":
-        # activate softforks immediately on testnet
-        if "SOFT_FORK2_HEIGHT" not in overrides:
-            overrides["SOFT_FORK2_HEIGHT"] = 0
+    update_testnet_overrides(network_id, overrides)
     updated_constants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
     initialize_service_logging(service_name=SERVICE_NAME, config=config)
-    service = create_full_node_service(DEFAULT_ROOT_PATH, config, updated_constants)
-    await service.setup_process_global_state()
-    await service.run()
+    service = await create_full_node_service(DEFAULT_ROOT_PATH, config, updated_constants)
+    async with SignalHandlers.manage() as signal_handlers:
+        await service.setup_process_global_state(signal_handlers=signal_handlers)
+        await service.run()
 
     return 0
 
@@ -89,9 +89,9 @@ async def async_main(service_config: Dict[str, Any]) -> int:
 def main() -> int:
     freeze_support()
 
-    with maybe_manage_task_instrumentation(enable=os.environ.get("HDDCOIN_INSTRUMENT_NODE") is not None):
+    with maybe_manage_task_instrumentation(enable=os.environ.get("CHIA_INSTRUMENT_NODE") is not None):
         service_config = load_config_cli(DEFAULT_ROOT_PATH, "config.yaml", SERVICE_NAME)
-        target_peer_count = service_config.get("target_peer_count", 80) - service_config.get(
+        target_peer_count = service_config.get("target_peer_count", 40) - service_config.get(
             "target_outbound_peer_count", 8
         )
         if target_peer_count < 0:

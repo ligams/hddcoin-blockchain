@@ -10,30 +10,30 @@ from hddcoin.wallet.util.address_type import AddressType, ensure_valid_address, 
 @pytest.mark.parametrize("prefix", [None])
 def test_hdd_hrp_for_default_config(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
-    assert AddressType.HDD.hrp(config) == "hdd"
+    assert AddressType.HDD.hrp(config) == "xch"
 
 
-@pytest.mark.parametrize("prefix", ["thdd"])
+@pytest.mark.parametrize("prefix", ["txch"])
 def test_thdd_hrp_for_testnet(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
-    assert AddressType.HDD.hrp(config) == "thdd"
+    assert AddressType.HDD.hrp(config) == "txch"
 
 
 @pytest.mark.parametrize("prefix", [None])
-def test_is_valid_address_hdd(config_with_address_prefix: Dict[str, Any]) -> None:
+def test_is_valid_address_xch(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     valid = is_valid_address(
-        "hdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8taffd", allowed_types={AddressType.HDD}, config=config
+        "xch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8taffd", allowed_types={AddressType.HDD}, config=config
     )
     assert valid is True
 
 
-@pytest.mark.parametrize("prefix", ["thdd"])
-def test_is_valid_address_thdd(config_with_address_prefix: Dict[str, Any]) -> None:
+@pytest.mark.parametrize("prefix", ["txch"])
+def test_is_valid_address_txch(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     # THDD address validation requires a config
     valid = is_valid_address(
-        "thdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs2v6lg7",
+        "txch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs2v6lg7",
         allowed_types={AddressType.HDD},
         config=config,
     )
@@ -44,7 +44,7 @@ def test_is_valid_address_thdd(config_with_address_prefix: Dict[str, Any]) -> No
 def test_is_valid_address_hdd_bad_address(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     valid = is_valid_address(
-        "hdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8xxxxx", allowed_types={AddressType.HDD}, config=config
+        "xch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8xxxxx", allowed_types={AddressType.HDD}, config=config
     )
     assert valid is False
 
@@ -58,7 +58,7 @@ def test_is_valid_address_nft(config_with_address_prefix: Dict[str, Any]) -> Non
     assert valid is True
 
 
-@pytest.mark.parametrize("prefix", ["thdd"])
+@pytest.mark.parametrize("prefix", ["txch"])
 def test_is_valid_address_nft_with_testnet(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     valid = is_valid_address(
@@ -87,7 +87,7 @@ def test_is_valid_address_did(config_with_address_prefix: Dict[str, Any]) -> Non
     assert valid is True
 
 
-@pytest.mark.parametrize("prefix", ["thdd"])
+@pytest.mark.parametrize("prefix", ["txch"])
 def test_is_valid_address_did_with_testnet(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     valid = is_valid_address(
@@ -110,23 +110,23 @@ def test_is_valid_address_did_bad_address(config_with_address_prefix: Dict[str, 
 
 
 @pytest.mark.parametrize("prefix", [None])
-def test_ensure_valid_address_hdd(config_with_address_prefix: Dict[str, Any]) -> None:
+def test_ensure_valid_address_xch(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     address = ensure_valid_address(
-        "hdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8taffd", allowed_types={AddressType.HDD}, config=config
+        "xch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8taffd", allowed_types={AddressType.HDD}, config=config
     )
-    assert address == "hdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8taffd"
+    assert address == "xch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8taffd"
 
 
-@pytest.mark.parametrize("prefix", ["thdd"])
-def test_ensure_valid_address_thdd(config_with_address_prefix: Dict[str, Any]) -> None:
+@pytest.mark.parametrize("prefix", ["txch"])
+def test_ensure_valid_address_txch(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     address = ensure_valid_address(
-        "thdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs2v6lg7",
+        "txch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs2v6lg7",
         allowed_types={AddressType.HDD},
         config=config,
     )
-    assert address == "thdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs2v6lg7"
+    assert address == "txch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs2v6lg7"
 
 
 @pytest.mark.parametrize("prefix", [None])
@@ -134,7 +134,7 @@ def test_ensure_valid_address_hdd_bad_address(config_with_address_prefix: Dict[s
     config = config_with_address_prefix
     with pytest.raises(ValueError):
         ensure_valid_address(
-            "hdd1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8xxxxx",
+            "xch1mnr0ygu7lvmk3nfgzmncfk39fwu0dv933yrcv97nd6pmrt7fzmhs8xxxxx",
             allowed_types={AddressType.HDD},
             config=config,
         )
@@ -186,4 +186,4 @@ def test_ensure_valid_address_did_bad_address(config_with_address_prefix: Dict[s
 def test_ensure_valid_address_bad_length(config_with_address_prefix: Dict[str, Any]) -> None:
     config = config_with_address_prefix
     with pytest.raises(ValueError):
-        ensure_valid_address("hdd1qqqqqqqqqqqqqqqqwygzk5", allowed_types={AddressType.HDD}, config=config)
+        ensure_valid_address("xch1qqqqqqqqqqqqqqqqwygzk5", allowed_types={AddressType.HDD}, config=config)

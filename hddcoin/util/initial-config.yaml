@@ -4,9 +4,11 @@ min_mainnet_k_size: 32
 ping_interval: 120
 self_hostname: &self_hostname "localhost"
 prefer_ipv6: False
+rpc_timeout: 300
 daemon_port: 25400
 daemon_max_message_size: 50000000 # maximum size of RPC message in bytes
 daemon_heartbeat: 300 # sets the heartbeat for ping/ping interval and timeouts
+daemon_allow_tls_1_2: False # if True, allow TLS 1.2 for daemon connections
 inbound_rate_limit_percent: 100
 outbound_rate_limit_percent: 30
 
@@ -135,6 +137,20 @@ harvester:
   hddcoin_ssl_ca:
     crt: "config/ssl/ca/hddcoin_ca.crt"
     key: "config/ssl/ca/hddcoin_ca.key"
+
+  # Compressed harvesting.
+  parallel_decompressor_count: 0
+  # If set to 0, `decompressor_thread_count` will default to half of nproc available on the machine.
+  # A non-zero number overrides this default.
+  decompressor_thread_count: 0
+  disable_cpu_affinity: False
+  # Ignore compressed plots with compression level greater than this.
+  max_compression_level_allowed: 7
+  use_gpu_harvesting: False
+  gpu_index: 0
+  enforce_gpu_index: False
+  # If no decompressor is available after `decompressor_timeout` seconds, abort the current operation.
+  decompressor_timeout: 20
 
 pool:
   # Replace this with a real receive address
@@ -284,6 +300,8 @@ full_node:
   # If node is more than these blocks behind, will do a short batch-sync, if it's less, will do a backtrack sync
   short_sync_blocks_behind_threshold: 20
 
+  bad_peak_cache_size: 100
+
   # When creating process pools the process count will generally be the CPU count minus
   # this reserved core count.
   reserved_cores: 0
@@ -298,7 +316,7 @@ full_node:
   # How long to wait for a peer connection
   peer_connect_timeout: 30
   # Accept peers until this number of connections
-  target_peer_count: 80
+  target_peer_count: 40
   # Initiate outbound connections until this number is hit.
   target_outbound_peer_count: 8
   # IPv4/IPv6 network addresses and CIDR blocks allowed to connect even when target_peer_count has been hit.
@@ -321,6 +339,10 @@ full_node:
   sanitize_weight_proof_only: False
   # timeout for weight proof request
   weight_proof_timeout: &weight_proof_timeout 360
+
+  # when the full node enters sync-mode, we wait until we have collected peaks
+  # from at least 3 peers, or until we've waitied this many seconds
+  max_sync_wait: 30
 
   # when enabled, the full node will print a pstats profile to the root_dir/profile every second
   # analyze with hddcoin/utils/profiler.py
@@ -558,6 +580,11 @@ data_layer:
   rpc_port: 28562
   rpc_server_max_request_body_size: 26214400
   fee: 1000000000
+
+  # this is a debug and profiling facility that logs all SQLite commands to a
+  # separate log file (under logging/data_sql.log).
+  log_sqlite_cmds: False
+
   logging: *logging
 
   # TODO: which of these are really appropriate?
@@ -568,8 +595,11 @@ data_layer:
     public_crt: "config/ssl/data_layer/public_data_layer.crt"
     public_key: "config/ssl/data_layer/public_data_layer.key"
 
-  uploaders: []
-  downloaders: []
+  plugins:
+    uploaders: []
+    downloaders: []
+  maximum_full_file_count: 1
+
 simulator:
   # Should the simulator farm a block whenever a transaction is in mempool
   auto_farm: True

@@ -12,13 +12,13 @@ from hddcoin.protocols.wallet_protocol import RespondFeeEstimates
 from hddcoin.server.server import HDDcoinServer
 from hddcoin.simulator.block_tools import BlockTools
 from hddcoin.simulator.full_node_simulator import FullNodeSimulator
-from hddcoin.simulator.time_out_assert import time_out_assert
 from hddcoin.util.ints import uint64
 from hddcoin.wallet.wallet import Wallet
 from tests.core.node_height import node_height_at_least
+from tests.util.time_out_assert import time_out_assert
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_protocol_messages(
     simulator_and_wallet: Tuple[
         List[Union[FullNodeAPI, FullNodeSimulator]], List[Tuple[Wallet, HDDcoinServer]], BlockTools
