@@ -85,9 +85,6 @@ def get_name_puzzle_conditions(
     if mempool_mode:
         flags = flags | MEMPOOL_MODE
 
-    if height >= constants.HARD_FORK_FIX_HEIGHT:
-        run_block = run_block_generator2
-
     try:
         block_args = [bytes(gen) for gen in generator.generator_refs]
         err, result = run_block(bytes(generator.program), block_args, max_cost, flags)

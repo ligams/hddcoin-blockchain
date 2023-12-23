@@ -2122,10 +2122,8 @@ class TestGeneratorConditions:
         # CREATE_COIN
         puzzle_hash = "abababababababababababababababab"
 
-        if softfork_height >= test_constants.HARD_FORK_FIX_HEIGHT:
-            generator_base_cost = 40
-        else:
-            generator_base_cost = 20470
+
+        generator_base_cost = 20470
 
         # this max cost is exactly enough for the create coin condition
         npc_result = generator_condition_tester(
@@ -2162,10 +2160,7 @@ class TestGeneratorConditions:
     def test_agg_sig_cost(self, condition, softfork_height):
         pubkey = "abababababababababababababababababababababababab"
 
-        if softfork_height >= test_constants.HARD_FORK_FIX_HEIGHT:
-            generator_base_cost = 40
-        else:
-            generator_base_cost = 20512
+        generator_base_cost = 20512
 
         if softfork_height < test_constants.HARD_FORK_HEIGHT and condition in [
             ConditionOpcode.AGG_SIG_PARENT,

@@ -154,7 +154,6 @@ test_constants = dataclasses.replace(
     # we deliberately make this different from HARD_FORK_HEIGHT in the
     # tests, to ensure they operate independently (which they need to do for
     # testnet10)
-    HARD_FORK_FIX_HEIGHT=uint32(5496100),
 )
 
 
@@ -1968,31 +1967,14 @@ def compute_cost_test(generator: BlockGenerator, constants: ConsensusConstants, 
 
     condition_cost = 0
     clvm_cost = 0
+    block_program_args = SerializedProgram.to([[bytes(g) for g in generator.generator_refs]])
+    clvm_cost, result = GENERATOR_MOD._run(INFINITE_COST, MEMPOOL_MODE, [generator.program, block_program_args])
 
-    if height >= constants.HARD_FORK_FIX_HEIGHT:
-        blocks = [bytes(g) for g in generator.generator_refs]
-        cost, result = generator.program._run(INFINITE_COST, MEMPOOL_MODE | ALLOW_BACKREFS, [DESERIALIZE_MOD, blocks])
-        clvm_cost += cost
-
-        for spend in result.first().as_iter():
-            # each spend is a list of:
-            # (parent-coin-id puzzle amount solution)
-            puzzle = spend.at("rf")
-            solution = spend.at("rrrf")
-
-            cost, result = puzzle._run(INFINITE_COST, MEMPOOL_MODE, solution)
-            clvm_cost += cost
-            condition_cost += conditions_cost(result, height >= constants.HARD_FORK_HEIGHT)
-
-    else:
-        block_program_args = SerializedProgram.to([[bytes(g) for g in generator.generator_refs]])
-        clvm_cost, result = GENERATOR_MOD._run(INFINITE_COST, MEMPOOL_MODE, [generator.program, block_program_args])
-
-        for res in result.first().as_iter():
-            # each condition item is:
-            # (parent-coin-id puzzle-hash amount conditions)
-            conditions = res.at("rrrf")
-            condition_cost += conditions_cost(conditions, height >= constants.HARD_FORK_HEIGHT)
+    for res in result.first().as_iter():
+        # each condition item is:
+        # (parent-coin-id puzzle-hash amount conditions)
+        conditions = res.at("rrrf")
+        condition_cost += conditions_cost(conditions, height >= constants.HARD_FORK_HEIGHT)
 
     size_cost = len(bytes(generator.program)) * constants.COST_PER_BYTE
 
